@@ -1,8 +1,7 @@
-# Statistics for Health Data Science: An Organic Approach
+# Statistics for Health Data Science
+## An Organic Approach
 
 This page links to R code for downloading data from two national health surveys and for implementing analyses in the book. Direct downloads of selected datasets analyzed in the book are also provided.
-
-## R code
 
 ### R code for downloading data from selected national health surveys:
 
@@ -22,7 +21,7 @@ This page links to R code for downloading data from two national health surveys 
   - [Chapter 9: Survey data analysis](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter9.R)
   - [Chapter 10: Prediction](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter10.R)
 
-## Direct downloads for selected datasets used in Chapter 5:
+### Direct downloads for selected datasets used in Chapter 5:
 
   - [Outpatient visits in the Basic Health Plan of Washington State](https://github.com/roman-gulati/statistics-for-health-data-science/data/bhp_outpatient_visits.csv)
   - [Prostate cancer mortality from the Surveillance, Epidemiology, and End Results program](https://github.com/roman-gulati/statistics-for-health-data-science/data/prostate_cancer_mortality.csv)
