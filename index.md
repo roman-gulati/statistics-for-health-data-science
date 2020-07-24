@@ -1,14 +1,8 @@
-# Statistics for Health Data Science: An Organic Approach
-
-This page provides R code and selected datasets to supplement the textbook.
-
-## R code
-
-### R code for downloading data from the Medical Expenditure Panel Survey (MEPS) and the National Health and Nutrition Examination Survey (NHANES)
+## R code for downloading data from the Medical Expenditure Panel Survey (MEPS) and the National Health and Nutrition Examination Survey (NHANES)
 
   - [Downloading MEPS and NHANES data](https://github.com/roman-gulati/statistics-for-health-data-science/code/reading_meps_nhanes.R)
   
-### R code for specific chapters
+## R code for specific chapters
 
   - [Chapter 1: Health data science](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter1.R)
   - [Chapter 2: Statistical background](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter2.R)
