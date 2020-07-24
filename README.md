@@ -1,37 +1,32 @@
-## Welcome to GitHub Pages
+# Statistics for Health Data Science: An Organic Approach
 
-You can use the [editor on GitHub](https://github.com/roman-gulati/statistics-for-health-data-science/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+This page provides R code and selected datasets to supplement the textbook.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+## R code
 
-### Markdown
+### R code for downloading MEPS and NHANES data
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+  [Reading MEPS and NHANES](https://github.com/roman-gulati/statistics-for-health-data-science/code/reading_meps_nhanes.R)
+  
+### R code for specific chapters
 
-```markdown
-Syntax highlighted code block
+  [Chapter 1](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter1.R)
+  [Chapter 2](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter2.R)
+  [Chapter 3](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter3.R)
+  [Chapter 4](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter4.R)
+  [Chapter 5](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter5.R)
+  [Chapter 6](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter6.R)
+  [Chapter 7](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter7.R)
+  [Chapter 8](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter8.R)
+  [Chapter 9](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter9.R)
+  [Chapter 10](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter10.R)
 
-# Header 1
-## Header 2
-### Header 3
+## Selected datasets
 
-- Bulleted
-- List
+[Data on outpatient visits in the Basic Health Plan of Washington State](https://github.com/roman-gulati/statistics-for-health-data-science/data/bhp_outpatient_visits.csv)
 
-1. Numbered
-2. List
+[Data on prostate cancer mortality by race from the Surveillance, Epidemiology, and End Results program](https://github.com/roman-gulati/statistics-for-health-data-science/data/prostate_cancer_mortality.csv)
 
-**Bold** and _Italic_ and `Code` text
+## Questions?
 
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/roman-gulati/statistics-for-health-data-science/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+[rgulati@.fredhutch.org](mailto:rgulati@fredhutch.org)
