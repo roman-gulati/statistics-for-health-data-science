@@ -1,6 +1,3 @@
-# Statistics for Health Data Science
-## _An Organic Approach_
-
 This page links to R code for downloading data from two national health surveys and for implementing analyses in the book. Direct downloads of selected datasets analyzed in the book are also provided.
 
 ### R code for downloading data from national health surveys:
