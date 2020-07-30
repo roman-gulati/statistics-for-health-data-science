@@ -1,4 +1,4 @@
-This page links to R code for downloading data from two national health surveys and for implementing analyses in the book. Direct downloads of selected datasets analyzed in the book are also provided.
+This page provides R code for downloading data from two national health surveys and for carrying out the example analyses in the book. Two datasets analyzed in the book are also provided.
 
 ### R code for downloading data from national health surveys:
 
@@ -7,8 +7,8 @@ This page links to R code for downloading data from two national health surveys 
   
 ### R code for example analyses:
 
-  - [Chapter 1: Health data science](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter1.R)
-  - [Chapter 2: Statistical background](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter2.R)
+  - [Chapter 1: Statistics and health data](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter1.R)
+  - [Chapter 2: Key statistical concepts](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter2.R)
   - [Chapter 3: Regression analysis](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter3.R)
   - [Chapter 4: Binary and categorical outcomes](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter4.R)
   - [Chapter 5: Count outcomes](https://github.com/roman-gulati/statistics-for-health-data-science/code/chapter5.R)
