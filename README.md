@@ -2,8 +2,8 @@ This page provides R code for downloading data from two national health surveys 
 
 ### R code for downloading data from national health surveys:
 
- - [Medical Expenditure Panel Survey (MEPS)](https://github.com/roman-gulati/statistics-for-health-data-science/src/grab_meps.R)
- - [National Health and Nutrition Examination Survey (NHANES)](https://github.com/roman-gulati/statistics-for-health-data-science/src/grab_nhanes.R)
+ - [Medical Expenditure Panel Survey (MEPS)](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/grab_meps.R)
+ - [National Health and Nutrition Examination Survey (NHANES)](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/grab_nhanes.R)
   
 ### R code for example analyses:
 
