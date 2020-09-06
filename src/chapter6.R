@@ -1,18 +1,14 @@
 ##################################################
-# Create figures and tables for Chapter 6
+# Chapter 6 examples
 ##################################################
 library(tidyverse)
 library(scales)
 library(grid)
 library(viridis)
-library(xtable)
 library(lmtest)
 library(quantreg)
 
-if(Sys.getenv('RSTUDIO') == '1')
-  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
-source('shared.R')
+source('grab_meps.R')
 
 set.seed(12345)
 
@@ -58,9 +54,9 @@ grab_and_curate_meps <- function(year, minage=18){
         dset %>% filter(Age < minage) %>% nrow(),
         'participants age <', minage, '\n')
     dset <- dset %>% filter(between(Age, minage, Inf))
-    dset
+    return(dset)
 }
-#dset <- grab_and_curate_meps(2017)
+dset <- grab_and_curate_meps(2017)
 
 ##################################################
 # Visualize inpatient, outpatient, and total costs
@@ -77,7 +73,6 @@ cost_histogram <- function(dset, varname, xmax=5, xstep=1, ymax=25, ystep=5){
     hdat <- hist(posdata, breaks=bpoints, plot=FALSE)
     hset <- with(hdat, data.frame(mids, counts))
     hset <- hset %>% mutate(scaledcounts=counts/1e3)
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+geom_bar(aes(x=mids, y=scaledcounts),
                       width=0.45,
@@ -94,29 +89,11 @@ cost_histogram <- function(dset, varname, xmax=5, xstep=1, ymax=25, ystep=5){
     gg <- gg+scale_y_continuous(name='Participants (1,000)\n',
                                 breaks=seq(0, ymax, by=ystep),
                                 limits=c(0, ymax))
-    return(gg)
+    print(gg)
 }
-
-cost_histograms <- function(dset, ext='pdf', saveit=FALSE){
-    ipanel <- cost_histogram(dset, 'Inpatient')
-    opanel <- cost_histogram(dset, 'Outpatient')
-    tpanel <- cost_histogram(dset, 'Total')
-    Layout <- grid.layout(ncol=3, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '06-cost_histograms'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(ipanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(opanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-    print(tpanel, vp=viewport(layout.pos.col=3, layout.pos.row=1))
-}
-#cost_histograms(dset, saveit=TRUE)
+cost_histogram(dset, 'Inpatient')
+cost_histogram(dset, 'Outpatient')
+cost_histogram(dset, 'Total')
 
 ##################################################
 # Summarize inpatient, outpatient, and total costs
@@ -137,7 +114,8 @@ summary_helper2 <- function(dset, varname, anyvarname=NULL){
                        row.names=NULL,
                        check.names=FALSE,
                        stringsAsFactors=FALSE)
-    sset %>% rename(!!sym(varname):='t(sset)')
+    sset <- sset %>% rename(!!sym(varname):='t(sset)')
+    return(sset)
 }
 
 summary_helper <- function(dset, varname){
@@ -146,31 +124,18 @@ summary_helper <- function(dset, varname){
     gset <- dset %>% filter(!!sym(anyvarname))
     gset <- gset %>% summary_helper2(varname)
     sset <- bind_rows(sset, gset)
+    return(sset)
 }
 
-summary_statistics <- function(dset, saveit=FALSE){
+summary_statistics <- function(dset){
     iset <- summary_helper(dset, 'Inpatient')
     oset <- summary_helper(dset, 'Outpatient')
     tset <- summary_helper(dset, 'Total')
     sset <- full_join(iset, oset, by=c('Group', 'Statistic'))
     sset <- full_join(sset, tset, by=c('Group', 'Statistic'))
-    if(saveit){
-        filename <- '06-summary_statistics.tex'
-        Caption <- 'Summary statistics of inpatient, outpatient and total medical expenditures in MEPS 2017 data for participants age 18 years or older. Statistics are reported separately for all participants and for participants with non-zero medical expenditures.'
-        print(xtable(sset,
-                     digits=0,
-                     align='lllrrr',
-                     label='tab:summary_statistics',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=c(0, 4))
-    }
+    return(sset)
 }
-#summary_statistics(dset, saveit=TRUE)
+summary_statistics(dset)
 
 ##################################################
 # Illustrate two (log)normal distributions
@@ -198,7 +163,7 @@ normal_density <- function(darg, qcutoff=0.2, rsize=10000, log=FALSE){
     tails <- lapply(darg, function(x) qfun(qcutoff, x$mean, x$sd, lower.tail=FALSE))
     means <- lapply(darg, function(x) mean(rfun(rsize, x$mean, x$sd)))
     dset <- tibble(x=seq(xmin, xmax, by=0.01))
-    gg_theme(legend.position=c(0.8, 0.8))
+    theme_update(legend.position=c(0.8, 0.8))
     gg <- ggplot(dset, aes(x=x))
     gg <- gg+ggtitle(ptitle)
     for(i in 1:length(darg)){
@@ -240,28 +205,11 @@ normal_density <- function(darg, qcutoff=0.2, rsize=10000, log=FALSE){
                                 limits=c(0, ymax),
                                 breaks=seq(0, ymax, by=ystep))
     gg <- gg+labs(x='\nx')
-    gg
+    print(gg)
 }
-
-normal_densities <- function(ext='pdf', log=FALSE, saveit=FALSE){
-    darg <- list(list(mean=0, sd=1), list(mean=0, sd=2))
-    npanel <- normal_density(darg, log=FALSE)
-    lpanel <- normal_density(darg, log=TRUE)
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '06-normal_and_lognormal_distributions'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(npanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(lpanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#normal_densities(saveit=TRUE)
+darg <- list(list(mean=0, sd=1), list(mean=0, sd=2))
+normal_density(darg, log=FALSE)
+normal_density(darg, log=TRUE)
 
 ##################################################
 # Illustrate linear regression fit to log total costs
@@ -284,12 +232,12 @@ format_model <- function(fit, dset){
                                Coefficient=Estimate,
                                SE=`Std. Error`,
                                'P-value'=paste0('$',
-                                                format_pvalue(!!sym(pname)),
+                                                !!sym(pname),
                                                 '$'))
-    cset
+    return(cset)
 }
 
-lognormal_regression_table <- function(dset, adjust=FALSE, saveit=FALSE){
+lognormal_regression_table <- function(dset, adjust=FALSE){
     dset <- dset %>% filter(AnyTotal)
     dset <- dset %>% filter(!is.na(Diabetes))
     if(adjust)
@@ -297,22 +245,6 @@ lognormal_regression_table <- function(dset, adjust=FALSE, saveit=FALSE){
     else
         fit <- lm(LogTotal~Diabetes, data=dset)
     fset <- format_model(fit, dset)
-    if(saveit){
-        filename <- '06-lognormal_regression_diabetes.tex'
-        Caption <- 'Fitted linear regression of the log of positive total medical expenditures in MEPS 2017 for particpants age 18 years or older.'
-        print(xtable(fset,
-                     digits=3,
-                     align='llccc',
-                     label='tab:lognormal_regression_diabetes',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
     dset <- dset %>% mutate(Residuals=residuals(fit))
     gset <- dset %>% group_by(Diabetes)
     gset <- gset %>% summarize(Variance=var(Residuals))
@@ -323,13 +255,13 @@ lognormal_regression_table <- function(dset, adjust=FALSE, saveit=FALSE){
     cat('Estimated effect of prior diabetes diagnosis:', diabetes_effect, '\n')
     print(bptest(fit))
 }
-#lognormal_regression_table(dset, adjust=FALSE, saveit=TRUE)
-#lognormal_regression_table(dset, adjust=TRUE, saveit=FALSE)
+lognormal_regression_table(dset, adjust=FALSE)
+lognormal_regression_table(dset, adjust=TRUE)
 
 ##################################################
 # Visualize gamma distributions
 ##################################################
-gamma_densities <- function(dset, dfun, darg, filename, ext='pdf', saveit=FALSE){
+gamma_densities <- function(dset, dfun, darg){
     dset <- tibble(x=seq(0, 20, by=0.1))
     darg <- list(list(shape=1, rate=1),
                  list(shape=1, rate=0.5),
@@ -337,8 +269,8 @@ gamma_densities <- function(dset, dfun, darg, filename, ext='pdf', saveit=FALSE)
                  list(shape=3, rate=0.5),
                  list(shape=9, rate=1),
                  list(shape=9, rate=0.5))
-    gg_theme(legend.position=c(0.8, 0.8),
-             legend.text=element_text(hjust=0))
+    theme_update(legend.position=c(0.8, 0.8),
+                 legend.text=element_text(hjust=0))
     gg <- ggplot(dset, aes(x=x))
     for(index in 1:length(darg)){
         iarg <- darg[[index]]
@@ -361,21 +293,13 @@ gamma_densities <- function(dset, dfun, darg, filename, ext='pdf', saveit=FALSE)
                                   labels=parse_format())
     gg <- gg+labs(x='\nx', y='f(x)\n')
     print(gg)
-    if(saveit){
-        filename <- '06-gamma_distributions'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#gamma_densities(saveit=TRUE)
+gamma_densities()
 
 ##################################################
 # Compare lognormal and gamma regression models
 ##################################################
-lognormal_gamma_regression_table <- function(dset, saveit=FALSE){
+lognormal_gamma_regression_table <- function(dset){
     dset <- dset %>% filter(AnyTotal)
     dset <- dset %>% filter(!is.na(Diabetes))
     gfit <- glm(Total~ScaledAge+Sex+Race+Diabetes,
@@ -393,24 +317,9 @@ lognormal_gamma_regression_table <- function(dset, saveit=FALSE){
                                  nset,
                                  stringsAsFactors=FALSE,
                                  check.names=FALSE))
-    if(saveit){
-        filename <- '06-lognormal_gamma_regression_diabetes.tex'
-        Caption <- 'Fitted linear regression of the log of positive total medical expenditures and gamma regression of total medical expenditures using a log link in MEPS 2017 for particpants age 18 years or older adjusted for age, sex and race/ethnicity.'
-        print(xtable(mset,
-                     digits=3,
-                     align='lllccc',
-                     label='tab:lognormal_gamma_regression_diabetes',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=c(0, 7))
-    }
+    return(mset)
 }
-#lognormal_gamma_regression_table(dset, saveit=TRUE)
+lognormal_gamma_regression_table(dset)
 
 ##################################################
 # Visualize mixture of normal densities
@@ -423,7 +332,7 @@ mixture_normal_density <- function(probability, size=1e4){
     label <- paste0('p == ', probability)
     dset <- tibble(x=c(sample1, sample2),
                    label=label)
-    gg_theme(legend.position=c(0.8, 0.8))
+    theme_update(legend.position=c(0.8, 0.8))
     gg <- ggplot(dset)
     gg <- gg+geom_density(aes(x=x, fill=label),
                           colour=NA,
@@ -441,32 +350,15 @@ mixture_normal_density <- function(probability, size=1e4){
                                 begin=0.45,
                                 labels=parse_format())
     gg <- gg+labs(y='f(x)\n')
-    gg
+    print(gg)
 }
-
-mixture_normal_densities <- function(dset, ext='pdf', saveit=FALSE){
-    panel1 <- mixture_normal_density(probability=0.2)
-    panel2 <- mixture_normal_density(probability=0.7)
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '06-mixture_normal_distributions'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(panel1, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(panel2, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#mixture_normal_densities(saveit=TRUE)
+mixture_normal_density(probability=0.2)
+mixture_normal_density(probability=0.7)
 
 ##################################################
 # Two-part model of total medical expenditures
 ##################################################
-two_part_regression_table <- function(dset, saveit=FALSE){
+two_part_regression_table <- function(dset){
     dset <- dset %>% filter(!is.na(Diabetes))
     bfit <- glm(AnyTotal~ScaledAge+Sex+Race+Diabetes,
                 family=binomial(link='logit'),
@@ -485,22 +377,6 @@ two_part_regression_table <- function(dset, saveit=FALSE){
                                  gset,
                                  stringsAsFactors=FALSE,
                                  check.names=FALSE))
-    if(saveit){
-        filename <- '06-two_part_regression_diabetes.tex'
-        Caption <- 'Fitted two-part model for total medical expenditures in MEPS 2017 for participants age 18 years or older adjusted for age, sex and race/ethnicity.'
-        print(xtable(mset,
-                     digits=3,
-                     align='lllccc',
-                     label='tab:two_part_regression_diabetes',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=c(0, 7))
-    }
     bpred0 <- predict(bfit, newdata=dset %>% mutate(Diabetes='No'), type='response')
     bpred1 <- predict(bfit, newdata=dset %>% mutate(Diabetes='Yes'), type='response')
     gpred0 <- predict(gfit, newdata=dset %>% mutate(Diabetes='No'), type='response')
@@ -512,7 +388,7 @@ two_part_regression_table <- function(dset, saveit=FALSE){
     lfit <- lm(Total~ScaledAge+Sex+Race+Diabetes, data=dset)
     cat('Linear regression estimate:', round(coef(lfit)['DiabetesYes']), '\n')
 }
-#two_part_regression_table(dset, saveit=FALSE)
+two_part_regression_table(dset)
 
 ###########################################################
 # Median regression for costs and log(costs)
@@ -528,11 +404,11 @@ format_quantile_model <- function(fit, dset, group){
                                Variable=sub(' = $', '', Variable),
                                Coefficient=Value,
                                SE=`Std. Error`,
-                               'P-value'=paste0('$', format_pvalue(`Pr(>|t|)`), '$'))
-    cset
+                               'P-value'=paste0('$', `Pr(>|t|)`, '$'))
+    return(cset)
 }
 
-median_regression_analysis <- function(dset, saveit=FALSE){
+median_regression_analysis <- function(dset){
     aset <- dset %>% filter(!is.na(Diabetes))
     pset <- aset %>% filter(AnyTotal)
     afit <- rq(Total~ScaledAge+Sex+Race+Diabetes, data=aset, tau=0.5)
@@ -540,22 +416,7 @@ median_regression_analysis <- function(dset, saveit=FALSE){
     pfit <- rq(Total~ScaledAge+Sex+Race+Diabetes, data=pset, tau=0.5)
     pmod <- format_quantile_model(pfit, aset, 'Non-zero costs')
     mset <- bind_rows(amod, pmod)
-    if(saveit){
-        filename <- '06-median_regression.tex'
-        Caption <- 'Median regression for total medical expenditures in MEPS 2017 for particpants age 18 years or older. Results are reported separately for all participants and for participants with non-zero medical expenditures.'
-        print(xtable(mset,
-                     digits=2,
-                     align='lllccc',
-                     label='tab:median_regression',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=c(0, 7))
-    }
+    return(mset)
 }
-#median_regression_analysis(dset, saveit=TRUE)
+median_regression_analysis(dset)
 

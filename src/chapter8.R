@@ -1,18 +1,12 @@
 ##################################################
-# Create figures and tables for Chapter 8
-# TODO: Complete generalizations of functions to
-# accommodate any response and predictor variables
+# Chapter 8 examples
 ##################################################
 library(tidyverse)
-library(xtable)
 library(scales)
 library(MatchIt)
 library(viridis)
 
-if(Sys.getenv('RSTUDIO') == '1')
-  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
-source('shared.R')
+source('grab_meps.R')
 
 set.seed(12345)
 
@@ -48,23 +42,9 @@ kidney_example_table <- function(dset){
                                                   sprintf('%4.1f%%', 100*Successes/Patients),
                                                   ')')))
     dtab <- dtab %>% spread(Size, Total)
-    filename <- '08-kidney_example.tex'
-    Caption <- 'Success of treatments for kidney stones.'
-    print(xtable(dtab,
-                 align='llrrr',
-                 digits=0,
-                 label='tab:kidney_example',
-                 caption=Caption),
-          file=here('tables', filename),
-          table.placement='!ht',
-          caption.placement='bottom',
-          sanitize.colnames.function=function(x) x,
-          sanitize.text.function=sanitize,
-          math.style.negative=TRUE,
-          include.rownames=FALSE,
-          hline.after=c(0, nrow(dtab)-1))
+    return(dtab)
 }
-#kidney_example_table(kset)
+kidney_example_table(kset)
 
 stratified_kidney_analysis <- function(dset){
     sset <- dset %>% group_by(Size)
@@ -94,7 +74,7 @@ stratified_kidney_analysis <- function(dset){
     cat('Fit from logistic regression:\n')
     print(exp(coef(fit)))
 }
-#stratified_kidney_analysis(kset)
+stratified_kidney_analysis(kset)
 
 matched_kidney_analysis <- function(dset, nreps=100){
     dset <- dset %>% select(-Total)
@@ -128,7 +108,7 @@ matched_kidney_analysis <- function(dset, nreps=100){
     print(sset)
     cat('Difference in success rates:', with(sset, -diff(Rate)), '\n')
 }
-#matched_kidney_analysis(kset)
+matched_kidney_analysis(kset)
 
 weighted_kidney_analysis <- function(dset){
     dset <- dset %>% mutate(Treatment=as.character(Treatment), Total=NULL)
@@ -158,7 +138,7 @@ weighted_kidney_analysis <- function(dset){
     print(sset)
     cat('Difference in success rates:', with(sset, -diff(Weighted.Rate)), '\n')
 }
-#weighted_kidney_analysis(kset)
+weighted_kidney_analysis(kset)
 
 ##################################################
 # Arthritis and health expenditures example
@@ -175,7 +155,8 @@ exclude <- function(dset,
         'missing',
         variable,
         '\n')
-    dset %>% filter(!(!!varsym %in% missing_codes))
+    dset <- dset %>% filter(!(!!varsym %in% missing_codes))
+    return(dset)
 }
 
 grab_and_curate_meps <- function(year){
@@ -222,9 +203,10 @@ grab_and_curate_meps <- function(year){
     dset <- dset %>% exclude('Arthritis')
     dset <- dset %>% exclude('Pain')
     dset <- dset %>% exclude('Diabetes')
-    dset %>% droplevels()
+    dset <- dset %>% droplevels()
+    return(dset)
 }
-#dset <- grab_and_curate_meps(2017)
+dset <- grab_and_curate_meps(2017)
 
 format_model <- function(fit, lab=NULL){
     if(is.null(lab))
@@ -240,7 +222,7 @@ format_model <- function(fit, lab=NULL){
                                Coef.=Estimate,
                                SE=`Std. Error`)
     names(cset)[-1] <- sub('$', lab, names(cset)[-1])
-    cset
+    return(cset)
 }
 
 stratified_arthritis_analysis <- function(dset,
@@ -249,8 +231,7 @@ stratified_arthritis_analysis <- function(dset,
                                           predictor=c('Arthritis',
                                                       'Sex',
                                                       'Diabetes',
-                                                      'Age'),
-                                          saveit=FALSE){
+                                                      'Age')){
     linear_predictor <- paste(predictor, collapse='+')
     linear_equation <- paste(linear_response, linear_predictor, sep='~')
     logistic_equation <- paste(logistic_response, linear_predictor, sep='~')
@@ -264,21 +245,6 @@ stratified_arthritis_analysis <- function(dset,
     logistic_formatted <- format_model(logistic_fit)
     fset <- bind_cols(logistic_formatted,
                       linear_formatted %>% select(-Variable))
-    if(saveit){
-        filename <- '08-arthritis_example.tex'
-        Caption <- 'Two-part model of effects of arthritis on health expenditures based on MEPS 2017 sample data: logistic regression for effect on any health expenditures and linear regression for the amount of health expenditures among persons with non-zero health expenditures.'
-        print(xtable(fset,
-                     digits=c(0, 0, 2, 2, 2, 2),
-                     align='ll|cc|cc',
-                     label='tab:arthritis_example',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
     yset <- dset %>% mutate(Arthritis='yes')
     yset <- yset %>% mutate(Probability=predict(logistic_fit,
                                                 newdata=yset,
@@ -322,9 +288,10 @@ stratified_arthritis_analysis <- function(dset,
     sset <- sset %>% group_by(Arthritis)
     sset <- sset %>% summarize(Cost=mean(Scaled))
     sset <- sset %>% mutate(Method='Stratifying')
-    bind_rows(uset, sset)
+    bset <- bind_rows(uset, sset)
+    return(bset)
 }
-#stratified_arthritis_analysis(dset, saveit=TRUE)
+stratified_arthritis_analysis(dset)
 
 matched_arthritis_analysis <- function(dset, max_age_difference=10){
     # matchit requires 0/1 response
@@ -350,9 +317,10 @@ matched_arthritis_analysis <- function(dset, max_age_difference=10){
     cat('Mean health expenditures in matched groups:\n')
     print(sset)
     cat('Difference in mean health expenditures rates:', with(sset, diff(Cost)), '\n')
-    sset %>% mutate(Method='Matching')
+    sset <- sset %>% mutate(Method='Matching')
+    return(sset)
 }
-#matched_arthritis_analysis(dset)
+matched_arthritis_analysis(dset)
 
 stratified_propensity_analysis <- function(dset, nstrata=4){
     sset <- dset %>% mutate(Strata=cut_interval(Propensity, n=nstrata))
@@ -370,7 +338,8 @@ stratified_propensity_analysis <- function(dset, nstrata=4){
     cat('Mean health expenditures across', nstrata, 'strata:\n')
     print(mset)
     cat('Difference in mean health expenditures rates:', with(mset, -diff(Cost)), '\n')
-    mset %>% mutate(Method='Stratifying')
+    mset <- mset %>% mutate(Method='Stratifying')
+    return(mset)
 }
 
 weighted_propensity_analysis <- function(dset){
@@ -388,15 +357,15 @@ weighted_propensity_analysis <- function(dset){
                             Arthritis=sub('Arthritis = yes', 'yes', Arthritis),
                             Cost=ifelse(Arthritis == 'yes', sum(Coef.), Coef.))
     sset <- sset %>% ungroup()
-    sset %>% transmute(Arthritis, Cost, Method)
+    sset <- sset %>% transmute(Arthritis, Cost, Method)
+    return(sset)
 }
 
-propensity_score_estimation <- function(dset, ext='pdf', saveit=FALSE){
+propensity_score_estimation <- function(dset){
     fit <- glm(Arthritis~Sex+Diabetes+Age,
                data=dset,
                family=binomial(link='logit'))
     pset <- dset %>% mutate(Propensity=fitted(fit))
-    gg_theme()
     gg <- ggplot(pset)
     gg <- gg+geom_histogram(aes(x=Propensity,
                                 y=..density..,
@@ -418,19 +387,11 @@ propensity_score_estimation <- function(dset, ext='pdf', saveit=FALSE){
     gg <- gg+scale_colour_viridis(name='Arthritis', discrete=TRUE, begin=0.75, end=0.25)
     gg <- gg+scale_fill_viridis(name='Arthritis', discrete=TRUE, begin=0.75, end=0.25)
     print(gg)
-    if(saveit){
-        filename <- '08-propensity_scores'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
-    pset
+    return(pset)
 }
-#pset <- propensity_score_estimation(dset, saveit=TRUE)
+pset <- propensity_score_estimation(dset)
 
-propensity_score_analysis <- function(dset, nstrata=10, saveit=FALSE){
+propensity_score_analysis <- function(dset, nstrata=10){
     sset <- stratified_propensity_analysis(dset, nstrata=nstrata)
     mset <- matched_arthritis_analysis(dset)
     wset <- weighted_propensity_analysis(dset)
@@ -445,23 +406,9 @@ propensity_score_analysis <- function(dset, nstrata=10, saveit=FALSE){
                                'Cost (no arthritis)'=dollar_format(accuracy=1)(no),
                                'Cost (arthritis)'=dollar_format(accuracy=1)(yes),
                                'Cost difference'=dollar_format(accuracy=1)(yes-no))
-    if(saveit){
-        filename <- '08-propensity_analysis.tex'
-        Caption <- 'Difference in average health expenditures between persons with and without arthritis from MEPS 2017 sample data based on unconditional analysis and propensity score analyses with stratifying, matching and weighting.'
-        print(xtable(tset,
-                     digits=0,
-                     align='llccc',
-                     label='tab:propensity_analysis',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
+    return(tset)
 }
-#propensity_score_analysis(pset, saveit=TRUE)
+propensity_score_analysis(pset)
 
 mediation_analysis <- function(dset,
                                response='Cost',
@@ -469,8 +416,7 @@ mediation_analysis <- function(dset,
                                cause='Arthritis',
                                confounders=c('Sex',
                                              'Diabetes',
-                                             'Age'),
-                               saveit=FALSE){
+                                             'Age')){
     dset <- dset %>% filter(Anycost)
     dset <- dset %>% mutate(Pain=as.integer(Pain))
     predictor1 <- paste(c(cause, confounders), collapse='+')
@@ -487,22 +433,6 @@ mediation_analysis <- function(dset,
     formatted3 <- format_model(fit3, ' (3)')
     fset <- full_join(formatted1, formatted2, by='Variable')
     fset <- full_join(fset, formatted3, by='Variable')
-    if(saveit){
-        filename <- '08-mediation_analysis.tex'
-        Caption <- 'Fitted regression models in the mediation analysis of the effect of arthritis on health expenditures using the MEPS 2017 sample data.'
-        print(xtable(fset,
-                     digits=2,
-                     align='ll|cc|cc|cc',
-                     label='tab:mediation_analysis',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              NA.string='-',
-              hline.after=0)
-    }
     total_effect <- coef(fit1)['Arthritisyes']
     effect_on_pain <- coef(fit2)['Arthritisyes']
     effect_of_pain <- coef(fit3)['Pain']
@@ -514,7 +444,7 @@ mediation_analysis <- function(dset,
     cat('Indirect/Total: ', indirect_effect/total_effect, '\n', sep='')
     fit3_interaction <- update(fit3, .~.+Arthritis:Pain)
     cat('Model (3) after adding cause-mediator interaction:\n')
-    coef(summary(fit3_interaction))
+    return(coef(summary(fit3_interaction)))
 }
-#mediation_analysis(dset, saveit=TRUE)
+mediation_analysis(dset)
 

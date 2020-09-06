@@ -1,29 +1,22 @@
 ##################################################
-# Create figures and tables for Chapter 3
+# Chapter 3 examples
 ##################################################
 library(tidyverse)
 library(scales)
 library(grid)
 library(viridis)
-library(xtable)
-library(here)
 library(quantreg)
-
-if(Sys.getenv('RSTUDIO') == '1')
-    setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 set.seed(1233)
 
-source('shared.R')
+source('grab_nhanes.R')
 
 ##################################################
 # Visualize variability around a regression line
 ##################################################
-regression_variability_panel <- function(dset, type){
+regression_variability_plot <- function(dset, type){
     dset <- dset %>% mutate(p=predict(lm(y~x)))
     panel_title <- switch(type, y='Variability around E(Y)', regression='Variability around E(Y|X)')
-    gg_theme(axis.ticks=element_blank(),
-             axis.text=element_blank())
     gg <- ggplot(dset)
     gg <- gg+ggtitle(panel_title)
     if(type == 'y'){
@@ -41,28 +34,11 @@ regression_variability_panel <- function(dset, type){
     }
     gg <- gg+geom_point(aes(x=x, y=y), size=2)
     gg <- gg+labs(x='\nx', y='y\n')
-    return(gg)
+    print(gg)
 }
-
-regression_variability_plot <- function(ext='pdf', saveit=FALSE){
-    dset <- tibble(x=seq(10), y=2*x+rnorm(10))
-    ypanel <- regression_variability_panel(dset, 'y')
-    rpanel <- regression_variability_panel(dset, 'regression')
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '03-regression_variability'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(ypanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(rpanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#regression_variability_plot(saveit=FALSE)
+dset <- tibble(x=seq(10), y=2*x+rnorm(10))
+regression_variability_plot(dset, 'y')
+regression_variability_plot(dset, 'regression')
 
 ##################################################
 # Initial exploration: age 20-59 years
@@ -73,8 +49,7 @@ iset <- bind_rows(grab_and_curate_nhanes(1999, minage=20, maxage=59),
 ##############################################
 # A single binary covariate
 ##############################################
-bmi_density_plot <- function(dset, ext='pdf', saveit=FALSE){
-    gg_theme()
+bmi_density_plot <- function(dset){
     gg <- ggplot(dset)
     gg <- gg+geom_histogram(aes(BMI,
                                 y=..density..,
@@ -96,14 +71,6 @@ bmi_density_plot <- function(dset, ext='pdf', saveit=FALSE){
     gg <- gg+scale_colour_viridis(name='', discrete=TRUE, begin=0.75, end=0.25)
     gg <- gg+scale_fill_viridis(name='', discrete=TRUE, begin=0.75, end=0.25)
     print(gg)
-    if(saveit){
-        filename <- '03-bmi_histogram'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
     # Overall summary
     oset <- dset %>% summarize(N=n(),
                                Mean=mean(BMI),
@@ -125,15 +92,14 @@ bmi_density_plot <- function(dset, ext='pdf', saveit=FALSE){
     # Proportion of variance explained
     with(oset, (Var-wset$WGVar)/Var)
 }
-#bmi_density_plot(iset, saveit=TRUE)
+bmi_density_plot(iset)
 
 ##################################################
 # Age scatterplot
 ##################################################
-age_scatterplot <- function(dset, correction=0.5, ext='pdf', saveit=FALSE){
+age_scatterplot <- function(dset, correction=0.5){
     gset <- dset %>% group_by(AGE)
     gset <- gset %>% summarize(BMI=mean(BMI))
-    gg_theme()
     gg <- ggplot(dset, aes(x=AGE, y=BMI))
     gg <- gg+geom_point(color='gray', size=1)
     gg <- gg+geom_segment(data=gset,
@@ -152,14 +118,6 @@ age_scatterplot <- function(dset, correction=0.5, ext='pdf', saveit=FALSE){
                                 breaks=seq(10, 70, by=10),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '03-age_vs_bmi'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
     # Compare simple averages and fitted regression values
     fit <- lm(BMI~AGE, data=dset)
     fset <- dset %>% distinct(AGE)
@@ -171,27 +129,14 @@ age_scatterplot <- function(dset, correction=0.5, ext='pdf', saveit=FALSE){
                       fset %>% filter(between(AGE, 40, 49)),
                       fset %>% filter(between(AGE, 50, 59)))
     names(fset) <- gsub('[.0-9]*$', '', names(fset))
-    if(saveit){
-        filename <- '03-naive_vs_fitted.tex'
-        Caption <- 'Average body mass index for persons age 20--59 years in NHANES sample data for years 1999--2000 and 2015--2016 and values from a regression line (REG).'
-        print(xtable(fset,
-                     digits=c(0, rep(c(0, 1, 1), 4)),
-                     align=paste0('l', paste(rep('ccc', 4), collapse='|')),
-                     label='tab:naive_vs_fitted',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='h',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              hline.after=0)
-    }
+    return(fset)
 }
-#age_scatterplot(iset, saveit=TRUE)
+age_scatterplot(iset)
 
 ##################################################
 # Visualize BMI trends by age, sex, and race/ethnicity
 ##################################################
-bmi_trends_plot <- function(dset, ext='pdf', saveit=FALSE){
+bmi_trends_plot <- function(dset){
     dset <- dset %>% mutate(AGEGROUP=sub('≤', '""<=', AGEGROUP),
                             AGEGROUP=sub('<=', '""<=', AGEGROUP),
                             AGEGROUP=sub('>', '"">', AGEGROUP),
@@ -199,13 +144,7 @@ bmi_trends_plot <- function(dset, ext='pdf', saveit=FALSE){
                             YEAR=sub('-', '-\n', YEAR))
     mset <- dset %>% group_by(SEX, AGEGROUP, RACE, YEAR)
     mset <- mset %>% summarize(BMI=mean(BMI))
-    gg_theme(panel.spacing.x=unit(0.01, 'npc'))
     gg <- ggplot(dset)
-    #gg <- gg+geom_violin(aes(x=YEAR,
-    #                         y=BMI,
-    #                         colour=interaction(SEX, AGEGROUP),
-    #                         fill=interaction(SEX, AGEGROUP)),
-    #                     alpha=0.4)
     gg <- gg+geom_dotplot(aes(x=YEAR,
                               y=BMI,
                               colour=interaction(SEX, AGEGROUP),
@@ -228,22 +167,13 @@ bmi_trends_plot <- function(dset, ext='pdf', saveit=FALSE){
     gg <- gg+scale_colour_viridis(name='', discrete=TRUE, begin=0.75, end=0.25)
     gg <- gg+scale_fill_viridis(name='', discrete=TRUE, begin=0.75, end=0.25)
     print(gg)
-    if(saveit){
-        filename <- '03-bmi_trends_age50'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#bmi_trends_plot(iset, saveit=TRUE)
+bmi_trends_plot(iset)
 
 ##################################################
 # QQ normal plot to assess normality
 ##################################################
-qqnormal_panel <- function(dset){
-    gg_theme()
+qqnormal_plot <- function(dset){
     gg <- ggplot(dset, aes(sample=Residuals))
     gg <- gg+ggtitle('QQ-normal plot')
     gg <- gg+stat_qq(geom='point',
@@ -255,15 +185,14 @@ qqnormal_panel <- function(dset){
     gg <- gg+scale_y_continuous(name='Residual quantiles',
                                 limits=c(-20, 40),
                                 expand=c(0, 0))
-    return(gg)
+    print(gg)
 }
 
 ##################################################
 # Residuals vs fitted plot to assess linearity
 # and constant variance
 ##################################################
-resvsfit_panel <- function(dset){
-    gg_theme()
+resvsfit_plot <- function(dset){
     gg <- ggplot(dset)
     gg <- gg+ggtitle('Residuals-versus-fitted-values plot')
     gg <- gg+geom_point(aes_string(x='Fitted',
@@ -276,28 +205,7 @@ resvsfit_panel <- function(dset){
     gg <- gg+scale_y_continuous(name='Residuals',
                                 limits=c(-20, 40),
                                 expand=c(0, 0))
-    return(gg)
-}
-
-##################################################
-# Model diagnostics plot
-##################################################
-model_diagnostics_plot <- function(dset, ext='pdf', saveit=FALSE){
-    qpanel <- qqnormal_panel(dset)
-    rpanel <- resvsfit_panel(dset)
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '03-model_diagnostics'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(qpanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(rpanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
+    print(gg)
 }
 
 ##################################################
@@ -307,8 +215,7 @@ linear_model <- function(dset,
                          alpha=0.05,
                          include.interaction=FALSE,
                          continuous.age=FALSE,
-                         scaled.age=FALSE,
-                         saveit=FALSE){
+                         scaled.age=FALSE){
     if(scaled.age)
         dset <- dset %>% mutate(AGE=AGE/10)
     if(include.interaction){
@@ -339,36 +246,14 @@ linear_model <- function(dset,
                                SE=`Std. Error`,
                                # '95% lower'=Estimate-qnorm(1-alpha/2)*`Std. Error`,
                                # '95% upper'=Estimate+qnorm(1-alpha/2)*`Std. Error`,
-                               'P-value'=format_pvalue(`Pr(>|t|)`))
+                               'P-value'=`Pr(>|t|)`)
     if(continuous.age)
         cset <- cset %>% mutate(Variable=sub('AGE =', 'AGE', Variable))
-    if(saveit){
-        filename <- paste('03', Label, sep='-')
-        filename <- paste(filename, 'tex', sep='.')
-        Caption <- paste0('Change in body mass index between 1999--2000 and 2015--2016 for persons age 20--59 years in NHANES sample data controlling for',
-                          ifelse(continuous.age,
-                                 ' continuous age and categorical sex and race/ethnicity',
-                                 ' categorical age, sex and race/ethnicity'),
-                          ifelse(include.interaction,
-                                 ' and age-year interaction.',
-                                 '.'))
-        print(xtable(cset,
-                     align='llrrr',
-                     digits=2,
-                     label=paste('tab', Label, sep=':'),
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.text.function=sanitize,
-              math.style.negative=TRUE,
-              include.rownames=FALSE,
-              hline.after=0)
-    }
     if(!include.interaction & !continuous.age){
         rset <- dset %>% mutate(Fitted=fitted(fit),
                                 Residuals=resid(fit))
-        model_diagnostics_plot(rset, saveit=saveit)
+        qqnormal_plot(rset)
+        resvsfit_plot(rset)
         # white women young early
         wwye <- matrix(c(1, 1, 0, 0, 0, 0, 0, 0), 1)
         wwye.ht <- multcomp::glht(fit, linfct=wwye)
@@ -392,30 +277,11 @@ linear_model <- function(dset,
                      BIC=BIC(fit))
     return(lstats)
 }
-#cat_ni <- linear_model(iset, include.interaction=FALSE, continuous.age=FALSE, saveit=TRUE)
-#con_ni <- linear_model(iset, include.interaction=FALSE, continuous.age=TRUE, saveit=TRUE)
-#cat_wi <- linear_model(iset, include.interaction=TRUE, continuous.age=FALSE, saveit=TRUE)
-#con_wi <- linear_model(iset, include.interaction=TRUE, continuous.age=TRUE, saveit=TRUE)
-
-#lset <- bind_rows(cat_ni, con_ni, cat_wi, con_wi)
-
-likelihood_statistics_table <- function(dset){
-    filename <- '03-likelihood_statistics.tex'
-    Caption <- 'Summary statistics for four linear regression models of body mass index for persons age 20--59 years in NHANES sample data for 1999--2000 and 2015--2016.'
-    print(xtable(dset,
-                 align='ccccccc',
-                 digits=c(rep(0, 4), rep(1, 3)),
-                 label='tab:likelihood_statistics',
-                 caption=Caption),
-          file=here('tables', filename),
-          table.placement='!ht',
-          caption.placement='bottom',
-          sanitize.text.function=sanitize,
-          math.style.negative=TRUE,
-          include.rownames=FALSE,
-          hline.after=0)
-}
-#likelihood_statistics_table(lset)
+cat_ni <- linear_model(iset, include.interaction=FALSE, continuous.age=FALSE)
+con_ni <- linear_model(iset, include.interaction=FALSE, continuous.age=TRUE)
+cat_wi <- linear_model(iset, include.interaction=TRUE, continuous.age=FALSE)
+con_wi <- linear_model(iset, include.interaction=TRUE, continuous.age=TRUE)
+lset <- bind_rows(cat_ni, con_ni, cat_wi, con_wi)
 
 ##################################################
 # Load and filter NHANES demographic, BMI, PE data
@@ -483,13 +349,12 @@ pe_analysis(peset)
 ############################################
 # Quantile regression
 ############################################
-simple_quantile_regression_plot <- function(dset, correction=0.5, saveit=FALSE){
+simple_quantile_regression_plot <- function(dset, correction=0.5){
     q25 <- rq(BMI~AGE, data=dset, tau=0.25)
     q75 <- rq(BMI~AGE, data=dset, tau=0.75)
     pset <- tibble(AGE=seq(20, 59))
     pset <- pset %>% mutate(Predict25=predict(q25, newdata=pset),
                             Predict75=predict(q75, newdata=pset))
-    gg_theme()
     gg <- ggplot(dset)
     gg <- gg+geom_rect(data=pset,
                        aes(xmin=AGE-correction,
@@ -515,15 +380,8 @@ simple_quantile_regression_plot <- function(dset, correction=0.5, saveit=FALSE){
                                 breaks=seq(10, 70, by=10),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '03-quantile_regression.pdf'
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#simple_quantile_regression_plot(iset, saveit=TRUE)
+simple_quantile_regression_plot(iset)
 
 multivariate_quantile_regression <- function(dset, tau=0.5){
     lab <- switch(as.character(tau), '0.25'=' (1st)', '0.75'=' (3rd)')
@@ -537,32 +395,18 @@ multivariate_quantile_regression <- function(dset, tau=0.5){
                                Variable=sub('.*:.*', 'AGE-YEAR interaction', Variable),
                                Coef.=Value,
                                SE=`Std. Error`,
-                               P=format_pvalue(`Pr(>|t|)`))
+                               P=`Pr(>|t|)`)
     names(cset)[-1] <- sub('$', lab, names(cset)[-1])
     return(cset)
 }
 
-quartile_regression_table <- function(dset, saveit=FALSE){
+quartile_regression_table <- function(dset){
     q25 <- multivariate_quantile_regression(dset, tau=0.25)
     q75 <- multivariate_quantile_regression(dset, tau=0.75)
     fset <- bind_cols(q25, q75 %>% select(-Variable))
-    if(saveit){
-        filename <- '03-quartile_regression.tex'
-        Caption <- 'Quantile regression for the first (1st) and third (3rd) quartiles of body mass index by age for persons age 20--59 years in NHANES sample data for 1999--2000 and 2015--2016.'
-        print(xtable(fset,
-                     digits=c(0, 0, 2, 2, 4, 2, 2, 4),
-                     align='ll|ccc|ccc',
-                     label='tab:quartile_regression',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
+    return(fset)
 }
-#quartile_regression_table(iset, saveit=TRUE)
+quartile_regression_table(iset)
 
 ############################################
 # Nonparametric regression - kernel methods
@@ -573,7 +417,7 @@ dset <- bind_rows(grab_and_curate_nhanes(1999),
                   grab_and_curate_nhanes(2015))
 sset <- dset %>% sample_n(size=1000, replace=FALSE)
 
-regression_subgroup_panel <- function(dset, group){
+regression_subgroup_plot <- function(dset, group){
     group_sym <- sym(group)
     rset <- dset %>% group_by(!!group_sym)
     rset <- rset %>% summarize(Xmin=min(AGE),
@@ -582,7 +426,6 @@ regression_subgroup_panel <- function(dset, group){
     panel_title <- switch(group,
                           AGEGROUP='Age ≤50 vs >50 years',
                           AGEDECADE='Age 0-10, ..., 80-90 years')
-    gg_theme()
     gg <- ggplot(dset)
     gg <- gg+ggtitle(panel_title)
     gg <- gg+geom_point(aes(x=AGE, y=BMI),
@@ -601,26 +444,10 @@ regression_subgroup_panel <- function(dset, group){
                                 limits=c(9, 71),
                                 breaks=seq(10, 70, by=10),
                                 expand=c(0, 0))
-    return(gg)
+    print(gg)
 }
-
-regression_subgroup_plot <- function(dset, saveit=FALSE){
-    gpanel <- regression_subgroup_panel(dset, 'AGEGROUP')
-    dpanel <- regression_subgroup_panel(dset, 'AGEDECADE')
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '03-regression_subgroups.pdf'
-        cairo_pdf(here('figures', filename),
-                  height=5,
-                  width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(gpanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(dpanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#regression_subgroup_plot(sset, saveit=TRUE)
+regression_subgroup_plot(sset, 'AGEGROUP')
+regression_subgroup_plot(sset, 'AGEDECADE')
 
 ############################################
 # Manually calculate uniform kernel estimate
@@ -634,9 +461,7 @@ uset <- uset %>% mutate(BMIUNIFORM=mean(BMI))
 uniform_kernel_plot <- function(dset,
                                 example_age=42,
                                 halfwidth=5,
-                                correction=0.5,
-                                saveit=FALSE){
-    gg_theme()
+                                correction=0.5){
     gg <- ggplot(dset)
     gg <- gg+annotate(geom='rect',
                       xmin=example_age-halfwidth-correction,
@@ -661,16 +486,8 @@ uniform_kernel_plot <- function(dset,
                                 breaks=seq(10, 70, by=10),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '03-uniform_kernel.pdf'
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
-    return(gg)
 }
-#uniform_kernel_plot(uset, saveit=TRUE)
+uniform_kernel_plot(uset)
 
 ############################################
 # Manually calculate normal kernel estimate
@@ -683,12 +500,10 @@ nset <- sset %>% within({WEIGHTS <- outer(AGE, AGE, function(x, y) dnorm(x-y, sd
 normal_kernel_plot <- function(dset,
                                example_age=42,
                                bandwidth=3,
-                               correction=0.5,
-                               saveit=FALSE){
+                               correction=0.5){
     aset <- dset %>% distinct(AGE)
     aset <- aset %>% filter(AGE <= example_age)
     ages <- with(aset, unique(AGE))
-    gg_theme()
     gg <- ggplot(dset)
     for(age in ages){
         example_diff <- abs(example_age-age)
@@ -719,38 +534,6 @@ normal_kernel_plot <- function(dset,
                                 breaks=seq(10, 70, by=10),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '03-normal_kernel.pdf'
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               device=cairo_pdf,
-               height=5,
-               width=10)
-    }
-    return(gg)
 }
-#normal_kernel_plot(nset, saveit=TRUE)
-
-############################################
-# Show uniform and normal kernal plots as
-# panels in a single figure
-############################################
-uniform_normal_kernel_plot <- function(uset, nset, ext='pdf', saveit=FALSE){
-    upanel <- uniform_kernel_plot(uset)
-    npanel <- normal_kernel_plot(nset)
-    Layout <- grid.layout(ncol=2, nrow=1, heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '03-uniform_normal_kernel'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(upanel, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(npanel, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#uniform_normal_kernel_plot(uset, nset, saveit=TRUE)
+normal_kernel_plot(nset)
 

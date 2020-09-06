@@ -1,15 +1,11 @@
 ##################################################
-# Create figures and tables for Chapter 9
+# Chapter 9 examples
 ##################################################
 library(tidyverse)
-library(xtable)
 library(scales)
 library(survey)
 
-if(Sys.getenv('RSTUDIO') == '1')
-  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
-source('shared.R')
+source('grab_meps.R')
 
 options(survey.lonely.psu='adjust')
 
@@ -55,9 +51,9 @@ grab_and_curate_meps <- function(year, inscope_only=FALSE){
                                                    'Good',
                                                    'Fair',
                                                    'Poor')))
-    dset
+    return(dset)
 }
-#dset <- grab_and_curate_meps(2017)
+dset <- grab_and_curate_meps(2017)
 
 ##################################################
 # Age distributions and proportion of persons in
@@ -105,13 +101,12 @@ stratified_vs_simple_outcome <- function(dset, b=100, size=1000, fmt='%4.2f'){
                                 format_estimates(strars, fmt=fmt)))
     print(sset)
 }
-#stratified_vs_simple_outcome(dset)
+stratified_vs_simple_outcome(dset)
 
 stratified_vs_simple_distribution <- function(dset,
                                               b=100,
                                               size=1000,
-                                              fmt='%4.2f',
-                                              saveit=FALSE){
+                                              fmt='%4.2f'){
     # define age strata and outcome
     dset <- dset %>% mutate(Agegroup=cut(Age,
                                          breaks=c(0, 25, 55, Inf),
@@ -145,23 +140,9 @@ stratified_vs_simple_distribution <- function(dset,
                                'Age-stratified sampling'=format_estimates(Freq.strars, fmt))
     mset <- mset %>% rename(Age='Agegroup')
     mset <- mset %>% mutate(Age=sub('25-54', '25--54', Age))
-    if(saveit){
-        filename <- '09-stratified_vs_simple.tex'
-        Caption <- paste('Proportions and 95\\% confidence intervals of MEPS 2017 participants in various age groups selected by repeated simple random sampling or repeated age-stratified sampling; based on', b, 'replicates of', size, 'participants each.')
-        print(xtable(mset,
-                     digits=0,
-                     align='llcc',
-                     label='tab:stratified_vs_simple',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.text.function=sanitize,
-              include.rownames=FALSE,
-              hline.after=0)
-    }
+    return(mset)
 }
-#stratified_vs_simple_distribution(dset, saveit=TRUE)
+stratified_vs_simple_distribution(dset)
 
 ##################################################
 # Analyze costs associated with prior diagnosis of
@@ -181,11 +162,11 @@ format_model <- function(fit, type, fmt='%4.2f'){
                                                ', ',
                                                sprintf(fmt, Estimate+1.96*`Std. Error`),
                                                ')'),
-                               'P-value'=sub('(.*)', '$\\1 $', format_pvalue(`Pr(>|t|)`)))
-    cset
+                               'P-value'=sub('(.*)', '$\\1 $', `Pr(>|t|)`))
+    return(cset)
 }
 
-diabetes_analysis <- function(dset, saveit=FALSE){
+diabetes_analysis <- function(dset){
     cat('Adults in sample:',
         adults <- dset %>% filter(Age > 17) %>% nrow(),
         '\n')
@@ -228,24 +209,8 @@ diabetes_analysis <- function(dset, saveit=FALSE){
     fset <- bind_rows(format_model(naive_fit, 'Naive'),
                       format_model(unweighted_fit, 'Unweighted'),
                       format_model(weighted_fit, 'Weighted'))
-    if(saveit){
-        filename <- '09-incremental_cost_diabetes.tex'
-        Caption <- 'Estimated incremental medical costs for persons age 18 years or older in the US using a naive linear regression and unweighted and weighted regressions that account for the MEPS 2017 survey design, each adjusted for age, sex and race/ethnicity.'
-        print(xtable(fset,
-                     digits=2,
-                     align='llccc',
-                     label='tab:incremental_cost_diabetes',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.colnames.function=sanitize,
-              sanitize.text.function=identity,
-              include.rownames=FALSE,
-              hline.after=0)
-    }
     fset <- fset %>% mutate(Total=Coefficient*persons['DiabetesYes', 'total'])
     print(fset)
 }
-#diabetes_analysis(dset, saveit=TRUE)
+diabetes_analysis(dset)
 

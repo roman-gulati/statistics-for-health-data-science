@@ -1,17 +1,13 @@
 ##################################################
-# Create figures and tables for Chapter 7
+# Chapter 7 examples
 ##################################################
 library(tidyverse)
-library(xtable)
 library(grid)
 library(scales)
 library(viridis)
 library(rsample)
 
-if(Sys.getenv('RSTUDIO') == '1')
-  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
-source('shared.R')
+source('grab_meps.R')
 
 set.seed(1111)
 
@@ -62,12 +58,12 @@ grab_and_curate_meps <- function(year){
   dset <- dset %>% filter(Age > 17)
   dset %>% droplevels()
 }
-#pset <- grab_and_curate_meps(2017)
+pset <- grab_and_curate_meps(2017)
 
 ##################################################
 # Select a sample of 2000 records
 ##################################################
-#sset <- pset %>% sample_n(2000)
+sset <- pset %>% sample_n(2000)
 
 ##################################################
 # Visualize histograms
@@ -77,22 +73,12 @@ two_panel_plot <- function(dset1,
                            arg1,
                            arg2,
                            fun,
-                           ...,
-                           filename=NULL,
-                           ext='pdf',
-                           saveit=FALSE){
+                           ...){
     panel1 <- fun(dset1, arg1, ...)
     panel2 <- fun(dset2, arg2, ...)
     Layout <- grid.layout(ncol=2,
                           nrow=1,
                           heights=unit(5, 'null'))
-    if(saveit){
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
     grid.newpage()
     pushViewport(viewport(layout=Layout))
     print(panel1, vp=viewport(layout.pos.col=1, layout.pos.row=1))
@@ -104,7 +90,6 @@ cost_histogram <- function(dset, panel_title, nbreaks=30, xmax=6){
     hset <- with(hdat, data.frame(mids, density))
     cat('Median of costs in', tolower(panel_title), ':       ', median(dset$Cost), '\n')
     cat('Median of log(costs+1) in', tolower(panel_title), ':', median(dset$Logcost), '\n')
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+ggtitle(paste0(panel_title, ' (n=', nrow(dset), ')'))
     gg <- gg+geom_bar(aes(x=mids, y=density), stat='identity')
@@ -115,15 +100,13 @@ cost_histogram <- function(dset, panel_title, nbreaks=30, xmax=6){
     gg <- gg+scale_y_continuous(name='Density\n',
                                 limits=c(0, 1),
                                 expand=c(0, 0))
-    gg
+    print(gg)
 }
-#two_panel_plot(pset,
-#               sset,
-#               arg1='Population',
-#               arg2='Sample',
-#               fun=cost_histogram,
-#               filename='07-cost_histogram',
-#               saveit=TRUE)
+two_panel_plot(pset,
+               sset,
+               arg1='Population',
+               arg2='Sample',
+               fun=cost_histogram)
 
 ##################################################
 # Bootstrapping the median
@@ -138,7 +121,6 @@ median_cost_histogram <- function(dset, panel_title, B=5000, sample_size=2000, n
     hset <- with(hdat, data.frame(mids, density))
     cat('Range of median costs in', tolower(panel_title), ':', min(ests), max(ests), '\n')
     cat('SD of median costs in', tolower(panel_title), ':', sd(ests), '\n')
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+ggtitle(paste0(panel_title, ' (n=', original_size, ')'))
     gg <- gg+geom_bar(aes(x=mids, y=density), stat='identity')
@@ -148,15 +130,13 @@ median_cost_histogram <- function(dset, panel_title, B=5000, sample_size=2000, n
     gg <- gg+scale_y_continuous(name='Density\n',
                                 limits=c(0, 0.008),
                                 expand=c(0, 0))
-    gg
+    print(gg)
 }
-#two_panel_plot(pset,
-#               sset,
-#               arg1='Population',
-#               arg2='Sample',
-#               fun=median_cost_histogram,
-#               filename='07-median_cost_histogram',
-#               saveit=TRUE)
+two_panel_plot(pset,
+               sset,
+               arg1='Population',
+               arg2='Sample',
+               fun=median_cost_histogram)
 
 ##################################################
 # Illustrate bootstrap methods to study the probability
@@ -170,27 +150,23 @@ format_model <- function(fit, dset){
                                Predictor=sub('Age =', 'Age', Predictor),
                                Coefficient=Estimate,
                                'Maximum likelihood SE'=`Std. Error`)
-    cset
+    return(cset)
 }
 
 simple_histogram <- function(dset, panel_title, xlabel, nbreaks=30){
     hdat <- hist(dset, breaks=nbreaks, plot=FALSE)
     hset <- with(hdat, data.frame(mids, density))
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+ggtitle(panel_title)
     gg <- gg+geom_bar(aes(x=mids, y=density), stat='identity')
     gg <- gg+scale_x_continuous(name=xlabel,
                                 expand=c(0, 0))
     gg <- gg+scale_y_continuous(name='Density\n',
-                                #limits=c(0, 0.001),
-                                #breaks=seq(0, 0.001, by=0.0002),
-                                #labels=label_number(0.0001),
                                 expand=c(0, 0))
-    gg
+    print(gg)
 }
 
-bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
+bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05){
     # logistic regression for no medical costs
     dset <- dset %>% mutate(Nocost=!Anycost)
     fit <- glm(Nocost~Age+Sex,
@@ -208,21 +184,6 @@ bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
     bset <- do.call(rbind, ests)
     bses <- apply(bset, 2, sd)
     fset <- fset %>% mutate('Bootstrap SE'=bses)
-    if(saveit){
-        filename <- '07-bootstrap_no_cost.tex'
-        Caption <- 'Fitted logistic regression of no medical expenditures based on a sample of 2000 persons age 18 years or older in the MEPS 2017 data with maximum likelihood and bootstrap standard errors (SEs) based on 5000 bootstrap samples'
-        print(xtable(fset,
-                     digits=4,
-                     align='llccc',
-                     label='tab:bootstrap_no_cost',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
     # visualize regression coefficients
     bset <- as_tibble(bset)
     two_panel_plot(bset$Age,
@@ -230,9 +191,7 @@ bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
                    arg1='Coefficient for age',
                    arg2='Coefficient for sex',
                    fun=simple_histogram,
-                   xlabel='Coefficient values',
-                   filename='07-no_cost_coefficient_histogram',
-                   saveit=saveit)
+                   xlabel='Coefficient values')
     # marginal additive effect for sex in the sample
     wset <- dset %>% mutate(Sex='female')
     mset <- dset %>% mutate(Sex='male')
@@ -253,11 +212,6 @@ bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
     maes <- do.call(c, pred)
     cat('SE for marginal additive effect for sex:', sd(maes), '\n')
     gg <- simple_histogram(maes, '', 'Marginal additive effect for sex')
-    if(saveit)
-        ggsave(plot=gg,
-               file=here('figures', '07-marginal_additive_effect_for_sex.pdf'),
-               height=5,
-               width=10)
     # predict probability of no costs for hypothetical group
     pred <- map(rset$splits, function(x){
                     rfit <- glm(Nocost~Age+Sex, 
@@ -320,30 +274,14 @@ bootstrap_no_cost_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
     cset <- cset %>% mutate(Estimate=sub('-', '$-$', Estimate),
                             'Bootstrap-t'=gsub('-', '$-$', `Bootstrap-t`),
                             'Bootstrap percentile'=gsub('-', '$-$', `Bootstrap percentile`))
-    if(saveit){
-        filename <- '07-bootstrap_confidence_intervals.tex'
-        Caption <- 'Bootstrap-t and bootstrap percentile 95\\% confidence intervals for logistic regression coefficients and median medical expenditures based on a sample of 2000 persons age 18 years or older in the MEPS 2017 data'
-        print(xtable(cset,
-                     digits=0,
-                     align='llcccc',
-                     label='tab:bootstrap_confidence_intervals',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=c(0, nrow(fset)))
-    }
 }
-#bootstrap_no_cost_analysis(sset, saveit=TRUE)
+bootstrap_no_cost_analysis(sset)
 
 ##################################################
 # Bootstrap SE for marginal adjusted additive effect
 # for sex from a two-part model
 ##################################################
-bootstrap_two_part_analysis <- function(dset, B=1000, saveit=FALSE){
+bootstrap_two_part_analysis <- function(dset, B=1000){
     dset <- dset %>% filter(Diabetes %in% c('no', 'yes'))
     dset <- dset %>% mutate(ScaledAge=Age-18)
     bfit <- glm(Anycost~ScaledAge+Sex+Race+Diabetes,
@@ -381,13 +319,8 @@ bootstrap_two_part_analysis <- function(dset, B=1000, saveit=FALSE){
     maes <- do.call(c, pred)
     cat('SE for marginal adjusted additive effect for diabetes:', sd(maes), '\n')
     gg <- simple_histogram(maes, '', 'Marginal additive effect for diabetes')
-    if(saveit)
-        ggsave(plot=gg,
-               file=here('figures', '07-marginal_additive_effect_for_diabetes.pdf'),
-               height=5,
-               width=10)
 }
-#bootstrap_two_part_analysis(pset, saveit=TRUE)
+bootstrap_two_part_analysis(pset)
 
 ##################################################
 # Test differences in distributions of medical
@@ -396,18 +329,18 @@ bootstrap_two_part_analysis <- function(dset, B=1000, saveit=FALSE){
 ##################################################
 obs_exp_table <- function(dset, group){
     chi2 <- chisq.test(dset[[group]], dset[['Strata']])
-    dset %>% with(data.frame(Group=group,
-                             Strata=levels(Strata),
-                             Observed=chi2$observed['yes', ],
-                             Expected=chi2$expected['yes', ],
-                             stringsAsFactors=FALSE,
-                             row.names=NULL))
+    dset <- dset %>% with(data.frame(Group=group,
+                                     Strata=levels(Strata),
+                                     Observed=chi2$observed['yes', ],
+                                     Expected=chi2$expected['yes', ],
+                                     stringsAsFactors=FALSE,
+                                     row.names=NULL))
+    return(dset)
 }
 
 diabetes_vs_arthritis_histogram <- function(dset, panel_title, value, nbreaks=30){
     hdat <- hist(dset, breaks=nbreaks, plot=FALSE)
     hset <- with(hdat, data.frame(mids, density))
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+ggtitle(panel_title)
     gg <- gg+geom_bar(aes(x=mids, y=density), stat='identity')
@@ -417,10 +350,10 @@ diabetes_vs_arthritis_histogram <- function(dset, panel_title, value, nbreaks=30
     gg <- gg+scale_y_continuous(name='Density\n',
                                 limits=c(0, 0.2),
                                 expand=c(0, 0))
-    gg
+    print(gg)
 }
 
-diabetes_vs_arthritis_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALSE){
+diabetes_vs_arthritis_analysis <- function(dset, B=5000, alpha=0.05){
     tset <- dset %>% filter(xor(Arthritis == 'yes', Diabetes == 'yes'))
     tset <- tset %>% droplevels()
     cat(tset %>% filter(Diabetes == 'yes') %>% nrow(), 'persons have diabetes\n')
@@ -455,22 +388,6 @@ diabetes_vs_arthritis_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALS
     gset <- gset %>% mutate(Statistic=factor(Statistic, levels=c('Observed', 'Expected')),
                             Group=factor(Group, levels=c('Diabetes', 'Arthritis')))
     gset <- gset %>% arrange(Statistic, Group)
-    if(saveit){
-        filename <- '07-diabetes_vs_arthritis.tex'
-        Caption <- 'Observed and expected counts of persons with prior diagnosis of diabetes or arthritis based on a sample of 2000 persons from the MEPS 2017 data'
-        print(xtable(gset,
-                     digits=0,
-                     align='lllccccc',
-                     label='tab:diabetes_vs_arthritis',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              sanitize.text.function=identity,
-              math.style.negative=TRUE,
-              hline.after=c(0, 2))
-    }
     # bootstrap p-value
     group <- tset %>% with(Diabetes)
     strata <- tset %>% with(Strata)
@@ -494,9 +411,7 @@ diabetes_vs_arthritis_analysis <- function(dset, B=5000, alpha=0.05, saveit=FALS
                    arg1='Bootstrap samples',
                    arg2='Permutations',
                    fun=diabetes_vs_arthritis_histogram,
-                   value=cest,
-                   filename='07-diabetes_vs_arthritis_histogram',
-                   saveit=saveit)
+                   value=cest)
 }
-#diabetes_vs_arthritis_analysis(sset, saveit=TRUE)
+diabetes_vs_arthritis_analysis(sset)
 

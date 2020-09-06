@@ -1,25 +1,19 @@
 ##################################################
-# Create figures and tables for Chapter 10
+# Chapter 10 examples
 ##################################################
 library(tidyverse)
 library(scales)
 library(grid)
 library(viridis)
-library(xtable)
-library(here)
 library(glmnet)
 library(rpart)
-library(rattle)
 library(rpart.plot)
-library(RColorBrewer)
 library(randomForest)
-
-if(Sys.getenv('RSTUDIO') == '1')
-    setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 set.seed(1233)
 
-source('shared.R')
+source('grab_meps.R')
+source('grab_nhanes.R')
 
 ##################################################
 # Load or download/extract/save longitudinal MEPS
@@ -34,15 +28,15 @@ grab_longitudinal_meps <- function(panel){
                                  archive_filename)
     local_sas_archive <- paste0(year_code, 'ssp.zip')
     local_rdata <- paste(year_code, 'Rdata', sep='.')
-    if(file.exists(here('data', local_rdata))){
-        load(file=here('data', local_rdata))
+    if(file.exists(local_rdata)){
+        load(file=local_rdata)
     } else {
-        download.file(remote_sas_archive, here('data', local_sas_archive), mode='wb')
-        dset <- foreign::read.xport(unzip(here('data', local_sas_archive)))
+        download.file(remote_sas_archive, local_sas_archive, mode='wb')
+        dset <- foreign::read.xport(unzip(local_sas_archive))
         local_sas_file <- sub('ssp.zip$', '.ssp', local_sas_archive)
-        file.copy(local_sas_file, here('data', local_rdata), overwrite=TRUE)
+        file.copy(local_sas_file, local_rdata, overwrite=TRUE)
         unlink(local_sas_file)
-        save(dset, file=here('data', local_rdata))
+        save(dset, file=local_rdata)
     }
     dset <- dset %>% filter(INSCOPY1 == 1, INSCOPY2 == 1)
     return(dset)
@@ -200,13 +194,13 @@ grab_and_curate_meps <- function(panel=21, survey_round=3, survey_year=1){
         dset %>% filter(Age <= 17) %>% nrow(),
         'age 17 or younger\n')
     dset <- dset %>% filter(Age > 17)
-    dset
+    return(dset)
 }
 
 ##################################################
 # Illustrate data science concepts using NHANES 2015
 ##################################################
-#iset <- grab_and_curate_nhanes(2015, minage=0, maxage=80)
+iset <- grab_and_curate_nhanes(2015, minage=0, maxage=80)
 
 ##################################################
 # Define age groups of various sizes
@@ -214,15 +208,15 @@ grab_and_curate_meps <- function(panel=21, survey_round=3, survey_year=1){
 append_agegroups <- function(dset, ngroups=c(2, 5, 10, 20, 40, 79)){
     for(n in ngroups)
         iset <- iset %>% mutate(!!sym(paste0('AGEGROUPS', n)):=cut_interval(AGE, n=n))
-    iset
+    return(iset)
 }
-#iset <- append_agegroups(iset)
+iset <- append_agegroups(iset)
 
 ##################################################
 # Slice out training and testing data
 ##################################################
-#iset.train <- iset %>% slice(1:1000)
-#iset.test <- iset %>% slice(1001:2000)
+iset.train <- iset %>% slice(1:1000)
+iset.test <- iset %>% slice(1001:2000)
 
 ##################################################
 # Fit linear models for BMI given age group and
@@ -238,7 +232,8 @@ predict_bmi <- function(fits, dset, predictors){
     pset <- with(dset, data.frame(BMI, AGE, pset))
     names(pset) <- c('BMI', 'AGE', predictors)
     pset <- pset %>% gather(Predictor, Prediction, -BMI, -AGE)
-    pset %>% mutate(Predictor=as.factor(sub('^AGEGROUPS', '', Predictor)))
+    pset <- pset %>% mutate(Predictor=as.factor(sub('^AGEGROUPS', '', Predictor)))
+    return(pset)
 }
 pset.train <- predict_bmi(fits.train, iset.train, predictors)
 pset.test <- predict_bmi(fits.test, iset.test, predictors)
@@ -256,9 +251,10 @@ tidy_predictions <- function(dset, correction=0.5){
     xset <- xset %>% mutate(AGE=AGE+correction*2)
     pset <- bind_rows(pset, xset)
     pset <- pset %>% arrange(Predictor, AGE, Prediction)
+    return(pset)
 }
 
-bmi_by_agegroup_plot <- function(train, test=NA, filename=NA, ext='pdf', saveit=FALSE){
+bmi_by_agegroup_plot <- function(train, test=NA){
     if(!is.null(dim(test))){
         rset <- test
         train.alpha <- 0.5
@@ -266,7 +262,6 @@ bmi_by_agegroup_plot <- function(train, test=NA, filename=NA, ext='pdf', saveit=
         rset <- train
         train.alpha <- 1
     }
-    gg_theme()
     gg <- ggplot(rset)
     gg <- gg+geom_point(aes(x=AGE, y=BMI), color='gray', size=1)
     if(!is.null(dim(test)))
@@ -297,41 +292,12 @@ bmi_by_agegroup_plot <- function(train, test=NA, filename=NA, ext='pdf', saveit=
                                           '79'='#3B528BFF',
                                           'CART'='purple'))
     print(gg)
-    if(saveit){
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
-    gg
 }
-#bmi_by_agegroup_plot(pset.train %>% filter(Predictor %in% c(2, 79)),
-#                     filename='10-bmi_by_age_train',
-#                     saveit=TRUE)
-
-bmi_by_agegroup_performance_plot <- function(train, test, ext='pdf', saveit=FALSE){
-    panel1 <- bmi_by_agegroup_plot(train %>% filter(Predictor == 2),
-                                   test %>% filter(Predictor == 2))
-    panel2 <- bmi_by_agegroup_plot(train %>% filter(Predictor == 79),
-                                   test %>% filter(Predictor == 79))
-    Layout <- grid.layout(ncol=2,
-                          nrow=1,
-                          heights=unit(5, 'null'))
-    if(saveit){
-        filename <- '10-bmi_by_age_train_and_test'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-        on.exit(graphics.off())
-    }
-    grid.newpage()
-    pushViewport(viewport(layout=Layout))
-    print(panel1, vp=viewport(layout.pos.col=1, layout.pos.row=1))
-    print(panel2, vp=viewport(layout.pos.col=2, layout.pos.row=1))
-}
-#bmi_by_agegroup_performance_plot(pset.train, pset.test, saveit=TRUE)
+bmi_by_agegroup_plot(pset.train %>% filter(Predictor %in% c(2, 79)))
+bmi_by_agegroup_plot(pset.train %>% filter(Predictor == 2),
+                     pset.test %>% filter(Predictor == 2))
+bmi_by_agegroup_plot(pset.train %>% filter(Predictor == 79),
+                     pset.test %>% filter(Predictor == 79))
 
 ##################################################
 # Calculate mean squared errors
@@ -342,14 +308,14 @@ calculate_mse <- function(fits, dset, predictors, dataset){
     dset <- dset %>% group_by(Predictor)
     mset <- dset %>% summarize(Dataset=dataset,
                                MSE=mean(Error^2)/var(BMI))
+    return(mset)
 }
 
-mse_by_agegroup_size <- function(fits, train, test, predictors, ext='pdf', saveit=FALSE){
+mse_by_agegroup_size <- function(fits, train, test, predictors){
     mse.train <- calculate_mse(fits, train, predictors, 'Training')
     mse.test <- calculate_mse(fits, test, predictors, 'Testing')
     mset <- bind_rows(mse.train, mse.test)
     mset <- mset %>% mutate(Predictor=factor(as.integer(as.character(Predictor))))
-    gg_theme()
     gg <- ggplot(mset)
     gg <- gg+geom_point(aes(x=Predictor,
                             y=MSE,
@@ -364,23 +330,13 @@ mse_by_agegroup_size <- function(fits, train, test, predictors, ext='pdf', savei
     gg <- gg+scale_colour_viridis(discrete=TRUE, begin=0.75, end=0.25)
     gg <- gg+scale_alpha_manual(values=c('Training'=0.4, 'Testing'=1))
     print(gg)
-    if(saveit){
-        filename <- '10-mse_by_agegroup_size'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#mse_by_agegroup_size(fits.train, iset.train, iset.test, predictors, saveit=TRUE)
+mse_by_agegroup_size(fits.train, iset.train, iset.test, predictors)
 
 ##################################################
 # Visualize optimal fitted model
 ##################################################
-#bmi_by_agegroup_plot(pset.test %>% filter(Predictor == 10),
-#                     filename='10-bmi_by_age_optimal',
-#                     saveit=TRUE)
+bmi_by_agegroup_plot(pset.test %>% filter(Predictor == 10))
 
 ##################################################
 # K-fold cross-validation
@@ -392,10 +348,11 @@ cv_mse <- function(cv_vars, dset, k=10){
     fit <- lm(paste('BMI', cv_vars$Predictor, sep='~'), data=train.set)
     test.set <- test.set %>% mutate(Prediction=predict(fit, newdata=test.set))
     test.set <- test.set %>% mutate(Error=BMI-Prediction)
-    test.set %>% summarize(MSE=mean(Error^2)/var(BMI))
+    test.set <- test.set %>% summarize(MSE=mean(Error^2)/var(BMI))
+    return(test.set)
 }
 
-cv_mse_by_agegroup_size <- function(dset, ext='pdf', saveit=FALSE){
+cv_mse_by_agegroup_size <- function(dset){
     cvset <- expand.grid(Predictor=predictors, Replicate=seq(10))
     cvset <- cvset %>% group_by(Predictor, Replicate)
     cvset <- cvset %>% do(cv_mse(., dset))
@@ -404,7 +361,6 @@ cv_mse_by_agegroup_size <- function(dset, ext='pdf', saveit=FALSE){
     cvset <- cvset %>% mutate(Predictor=factor(Predictor))
     meset <- cvset %>% group_by(Predictor)
     meset <- meset %>% summarize(Mean=mean(MSE))
-    gg_theme()
     gg <- ggplot(cvset)
     gg <- gg+geom_point(aes(x=Predictor,
                             y=MSE,
@@ -423,16 +379,8 @@ cv_mse_by_agegroup_size <- function(dset, ext='pdf', saveit=FALSE){
                                 expand=c(0, 0))
     gg <- gg+scale_colour_viridis(discrete=TRUE, begin=0.75, end=0.25)
     print(gg)
-    if(saveit){
-        filename <- '10-cv_mse_by_agegroup_size'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#cv_mse_by_agegroup_size(iset.train, saveit=TRUE)
+cv_mse_by_agegroup_size(iset.train)
 
 ##################################################
 # Make design and prediction matrices to show
@@ -451,8 +399,9 @@ cv_lasso <- function(dset, gmat, pmat, uni.ages){
     pred.lasso <- tibble(AGE=uni.ages,
                          Predictor='LASSO',
                          Prediction=as.vector(predict(cv.lasso.fit, newx=pmat, s='lambda.min')))
+    return(pred.lasso)
 }
-#pred.lasso <- cv_lasso(iset.train, gmat, pmat, uni.ages)
+pred.lasso <- cv_lasso(iset.train, gmat, pmat, uni.ages)
 
 ##################################################
 # Ridge regression
@@ -462,20 +411,19 @@ cv_ridge <- function(dset, gmat, pmat, uni.ages){
     pred.ridge <- tibble(AGE=uni.ages,
                          Predictor='Ridge',
                          Prediction=as.vector(predict(cv.ridge.fit, newx=pmat, s='lambda.min')))
+    return(pred.ridge)
 }
-#pred.ridge <- cv_ridge(dset, gmat, pmat, uni.ages)
+pred.ridge <- cv_ridge(dset, gmat, pmat, uni.ages)
 
 ##################################################
 # Visualize standard and regularized predictions
 ##################################################
 bmi_by_age_standard_and_regularized_plot <- function(pred.standard,
                                                      pred.lasso,
-                                                     pred.ridge,
-                                                     ext='pdf',
-                                                     saveit=FALSE){
+                                                     pred.ridge){
     sset <- tidy_predictions(pred.standard)
     sset <- sset %>% mutate(Predictor=paste(Predictor, 'age groups'))
-    gg_theme(legend.position=c(0.15, 0.85))
+    theme_update(legend.position=c(0.15, 0.85))
     gg <- ggplot(pred.standard)
     gg <- gg+geom_point(aes(x=AGE, y=BMI), color='gray', size=1)
     gg <- gg+geom_step(data=sset,
@@ -512,24 +460,15 @@ bmi_by_age_standard_and_regularized_plot <- function(pred.standard,
                                           'LASSO'='#7AD151FF',
                                           'Ridge'='#483480FF'))
     print(gg)
-    if(saveit){
-        filename='10-bmi_by_age_standard_and_regularized'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#bmi_by_age_standard_and_regularized_plot(pset.train %>% filter(Predictor == 79),
-#                                         pred.lasso,
-#                                         pred.ridge,
-#                                         saveit=TRUE)
+bmi_by_age_standard_and_regularized_plot(pset.train %>% filter(Predictor == 79),
+                                         pred.lasso,
+                                         pred.ridge)
 
 ##################################################
 # Read longitudinal MEPS data
 ##################################################
-#mset <- grab_and_curate_meps(panel=21, survey_round=2)
+mset <- grab_and_curate_meps(panel=21, survey_round=2)
 
 ##################################################
 # Restrict to candidate predictor variables
@@ -568,23 +507,24 @@ fit_standard_regularized <- function(dset, predictors){
     fit.standard <- glmnet(x=mmat, y=dset$Anyhosp2017, lambda=0, family='binomial')
     fit.lasso <- cv.glmnet(x=mmat, y=dset$Anyhosp2017, alpha=1, family='binomial')
     fit.ridge <- cv.glmnet(x=mmat, y=dset$Anyhosp2017, alpha=0, family='binomial')
-    tibble(Predictor=rownames(coef(fit.standard)),
-           Standard=as.vector(coef(fit.standard)),
-           LASSO=as.vector(coef(fit.lasso)),
-           Ridge=as.vector(coef(fit.ridge)))
+    fset <- tibble(Predictor=rownames(coef(fit.standard)),
+                   Standard=as.vector(coef(fit.standard)),
+                   LASSO=as.vector(coef(fit.lasso)),
+                   Ridge=as.vector(coef(fit.ridge)))
+    return(fset)
 }
-#fset <- fit_standard_regularized(mset, predictors)
+fset <- fit_standard_regularized(mset, predictors)
 
 ##################################################
 # Show standard and regularized regression results
 ##################################################
-standard_and_regularized_barplot <- function(dset, ext='pdf', saveit=FALSE){
+standard_and_regularized_barplot <- function(dset){
     pset <- dset %>% gather(Model, Coefficient, -Predictor)
     pset <- pset %>% filter(Predictor != '(Intercept)')
     pset <- pset %>% mutate(Predictor=factor(Predictor, levels=unique(Predictor)),
                             Model=factor(Model, levels=c('Standard', 'LASSO', 'Ridge')))
-    gg_theme(legend.position=c(0.8, 0.2),
-             axis.text.x=element_blank())
+    theme_update(legend.position=c(0.8, 0.2),
+                 axis.text.x=element_blank())
     gg <- ggplot(pset)
     gg <- gg+geom_hline(aes(yintercept=0))
     gg <- gg+geom_bar(aes(x=Predictor,
@@ -599,18 +539,10 @@ standard_and_regularized_barplot <- function(dset, ext='pdf', saveit=FALSE){
                                 expand=c(0, 0))
     gg <- gg+scale_fill_viridis(discrete=TRUE, option='cividis', begin=0.9, end=0.1)
     print(gg)
-    if(saveit){
-        filename <- '10-standard_and_regularized_barplot'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#standard_and_regularized_barplot(fset, saveit=TRUE)
+standard_and_regularized_barplot(fset)
 
-standard_and_regularized_coefficients <- function(fset, mset, saveit=FALSE){
+standard_and_regularized_coefficients <- function(fset, mset){
     fset <- fset %>% mutate(Predictor=sub('(Intercept)', 'Intercept', Predictor, fixed=TRUE),
                             Predictor=gsub(paste0('(', paste(names(mset), collapse='|'), ')'), '\\1 = ', Predictor),
                             Predictor=sub('Age =', 'Age', Predictor),
@@ -623,23 +555,9 @@ standard_and_regularized_coefficients <- function(fset, mset, saveit=FALSE){
                             Predictor=sub('Cholesterol', 'High cholesterol', Predictor),
                             Predictor=sub('OHD', 'Other heart disease', Predictor),
                             Predictor=sub('Anyhosp2016 = TRUE', 'Hospitalized in 2016 = Yes', Predictor))
-    if(saveit){
-        filename <- '10-standard_and_regularized_coefficients.tex'
-        Caption <- 'Fitted standard, LASSO, and ridge regression models to predict hospitalization for persons age 18 years or older in 2017 using longitudinal MEPS 2016--2017 data.'
-        print(xtable(fset,
-                     digits=3,
-                     align='llccc',
-                     label='tab:standard_and_regularized_coefficients',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
+    return(fset)
 }
-#standard_and_regularized_coefficients(fset, mset, saveit=TRUE)
+standard_and_regularized_coefficients(fset, mset)
 
 ##################################################
 # Use CART to predict BMI by age
@@ -654,24 +572,13 @@ tree_mse <- function(dset, splits=NA){
     }
     equation <- paste('BMI', predictors, sep='~')
     fit <- lm(equation, data=dset)
-    summary(fit)$sigma^2
+    return(summary(fit)$sigma^2)
 }
 
-bmi_tree_analysis <- function(dset, ext='pdf', saveit=FALSE){
+bmi_tree_analysis <- function(dset){
     fit.tree <- rpart(BMI~AGE, data=dset, method='anova')
     #printcp(fit.tree)
-    if(saveit){
-        filename <- '10-bmi_tree_analysis'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=5,
-                 width=10)
-    }
-    #rpart.plot(fit.tree, tweak=1.05)
-    fancyRpartPlot(fit.tree, sub='', palettes='Blues', tweak=1.05)
-    if(saveit){
-        graphics.off()
-    }
+    rpart.plot(fit.tree, tweak=1.05)
     mse0 <- tree_mse(dset, splits=NA)
     mse1 <- tree_mse(dset, splits=13)
     mse2 <- tree_mse(dset, splits=c(13, 26))
@@ -680,17 +587,14 @@ bmi_tree_analysis <- function(dset, ext='pdf', saveit=FALSE){
     ratios <- 1-lead(mses)/mses
     cat('Reductions in MSEs:', ratios, '\n')
     pset <- dset %>% mutate(Predictor='CART', Prediction=predict(fit.tree))
-    bmi_by_agegroup_plot(pset,
-                         filename='10-bmi_by_age_tree',
-                         saveit=saveit)
+    bmi_by_agegroup_plot(pset)
 }
-#bmi_tree_analysis(iset.train, saveit=TRUE)
+bmi_tree_analysis(iset.train)
 
 ##################################################
 # Use CART to predict total expenditures
 ##################################################
-tree_error_plot <- function(dset, ext='pdf', saveit=FALSE){
-    gg_theme()
+tree_error_plot <- function(dset){
     gg <- ggplot(dset)
     gg <- gg+geom_hline(data=dset %>% filter(xerror+xstd == min(xerror+xstd)),
                         aes(yintercept=xerror+xstd),
@@ -708,31 +612,22 @@ tree_error_plot <- function(dset, ext='pdf', saveit=FALSE){
                                 breaks=seq(0.7, 1.1, by=0.1),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '10-cost_tree_error_vs_size'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
 
-expenditure_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FALSE){
+expenditure_tree_analysis <- function(dset, predictors){
     dset <- dset %>% select(all_of(predictors), Total.year1, Total.year2)
     dset <- dset %>% rename('Total expenditures in 2016'='Total.year1',
                             'Perceived health'='Perceived.health')
     cost.tree <- rpart(Total.year2~., data=dset, method='anova')
     #printcp(cost.tree)
     #rpart.plot(cost.tree)
-    #fancyRpartPlot(cost.tree, sub='', palettes='Blues', type=4)
     # explore greater depth
     cost.tree2 <- rpart(Total.year2~.,
                         data=dset,
                         method='anova',
                         control=rpart.control(cp=0.001, maxdepth=20))
     #plotcp(cost.tree2)
-    tree_error_plot(as.data.frame(cost.tree2$cptable), saveit=saveit)
+    tree_error_plot(as.data.frame(cost.tree2$cptable))
     best.cp <- cost.tree2$cptable[which.min(cost.tree2$cptable[, 'xerror']), 'CP']
     # constrain depth
     cost.tree3 <- rpart(Total.year2~.,
@@ -740,18 +635,7 @@ expenditure_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FALSE)
                         method='anova',
                         control=rpart.control(cp=best.cp))
     rpart.plot(cost.tree3)
-    if(saveit){
-        filename <- '10-cost_tree_analysis'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=8,
-                 width=10)
-    }
     rpart.plot(cost.tree3, tweak=1.05)
-    #fancyRpartPlot(cost.tree3, sub='', palettes='Blues', tweak=1.05)
-    if(saveit){
-        graphics.off()
-    }
     # calculate summaries within prediction strata
     pset <- dset %>% mutate(Prediction=predict(cost.tree3))
     pset <- pset %>% select('Total expenditures in 2016',
@@ -811,30 +695,16 @@ expenditure_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FALSE)
                                          '$39,288',
                                          '$35,261',
                                          '$95,723'))
-    if(saveit){
-        filename <- '10-cost_tree_predictions.tex'
-        Caption <- 'Predictions from regression tree for total medical expenditures in 2017 for persons age 18 years or older given variables observed in MEPS 2016 data.'
-        print(xtable(pset,
-                     digits=0,
-                     align='lccccc',
-                     label='tab:cost_tree_predictions',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              math.style.negative=TRUE,
-              hline.after=0)
-    }
+    return(pset)
 }
-#expenditure_tree_analysis(mset, predictors, saveit=TRUE)
+expenditure_tree_analysis(mset, predictors)
 
 ##################################################
 # Use CART to predict hospitalization. Illustrate
 # classification tree with splits even though this
 # isn't optimal
 ##################################################
-hospitalization_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FALSE){
+hospitalization_tree_analysis <- function(dset, predictors){
     dset <- dset %>% select(all_of(predictors), Total.year1, Anyhosp2017)
     dset <- dset %>% mutate(Edu12plus=factor(Edu12plus,
                                              levels=c('FALSE', 'TRUE'),
@@ -852,7 +722,6 @@ hospitalization_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FA
     printcp(hosp.tree)
     #plotcp(hosp.tree)
     #rpart.plot(hosp.tree)
-    #fancyRpartPlot(hosp.tree, sub='', palettes='Blues', type=4)
     # explore greater depth
     hosp.tree2 <- rpart(Anyhosp2017~.,
                         data=dset,
@@ -860,8 +729,7 @@ hospitalization_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FA
                         control=rpart.control(minsplit=20, cp=0.0032))
     plotcp(hosp.tree2, col='blue', lty='dashed')
     rpart.plot(hosp.tree2)
-    #fancyRpartPlot(hosp.tree2, sub='', palettes='Blues', type=4)
-    #tree_error_plot(as.data.frame(hosp.tree2$cptable), saveit=FALSE)
+    #tree_error_plot(as.data.frame(hosp.tree2$cptable))
     best.cp <- hosp.tree2$cptable[which.min(hosp.tree2$cptable[, 'xerror']), 'CP']
     # constrain depth
     hosp.tree3 <- rpart(Anyhosp2017~.,
@@ -874,23 +742,14 @@ hospitalization_tree_analysis <- function(dset, predictors, ext='pdf', saveit=FA
     ptab <- ptab %>% as.data.frame()
     ptab <- ptab %>% filter(Anyhosp2017 != Prediction)
     cat('Misclassification error:', ptab %>% with(sum(Freq)), '\n')
-    if(saveit){
-        filename <- '10-hosp_tree_analysis'
-        filename <- paste(filename, ext, sep='.')
-        get(ext)(here('figures', filename),
-                 height=8,
-                 width=10)
-        on.exit(graphics.off())
-    }
     rpart.plot(hosp.tree2, tweak=1.05)
-    #fancyRpartPlot(hosp.tree2, sub='', palettes='Blues', type=4, tweak=1.05)
 }
-#hospitalization_tree_analysis(mset, predictors, saveit=TRUE)
+hospitalization_tree_analysis(mset, predictors)
 
 ##################################################
 # Examine random forests
 ##################################################
-forest_importance_plot <- function(rfobject, ext='pdf', saveit=FALSE){
+forest_importance_plot <- function(rfobject){
     iset <- importance(rfobject)
     iset <- data.frame(Predictor=rownames(iset),
                        iset,
@@ -908,7 +767,8 @@ forest_importance_plot <- function(rfobject, ext='pdf', saveit=FALSE){
                             Predictor=sub('OHD', 'Other heart disease', Predictor),
                             Predictor=sub('Anyhosp2016', 'Hospitalized in 2016', Predictor),
                             Predictor=factor(Predictor, levels=Predictor))
-    gg_theme(axis.text.y=element_text(size=10))
+    theme_update(legend.position='none',
+                 axis.text.y=element_text(size=10))
     gg <- ggplot(iset)
     gg <- gg+geom_point(aes(x=PCMSE/100,
                             y=Predictor,
@@ -919,17 +779,9 @@ forest_importance_plot <- function(rfobject, ext='pdf', saveit=FALSE){
     gg <- gg+scale_colour_viridis(discrete=TRUE)
     gg <- gg+scale_y_discrete(name='')
     print(gg)
-    if(saveit){
-        filename <- '10-forest_importance_plot'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
 
-expenditure_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', saveit=FALSE){
+expenditure_forest_analysis <- function(dset, predictors, p=0.7){
     dset <- dset %>% select(all_of(predictors), Total.year1, Total.year2)
     total.rows <- nrow(dset)
     train.rows <- sample(total.rows, total.rows*p)
@@ -944,7 +796,7 @@ expenditure_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', save
     forest.mse <- dset.test %>% summarize(MSE=mean((Total.year2-Forest)^2))
     forest.mse <- forest.mse %>% unlist()
     cat('Forest MSE:', forest.mse, '\n')
-    forest_importance_plot(cost.forest, saveit=saveit)
+    forest_importance_plot(cost.forest)
     # grow large regression tree
     cost.tree <- rpart(Total.year2~.,
                        data=dset.train,
@@ -952,7 +804,7 @@ expenditure_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', save
                        control=rpart.control(cp=0.001))
     #plotcp(cost.tree)
     #printcp(cost.tree)
-    #tree_error_plot(as.data.frame(cost.tree$cptable), saveit=FALSE)
+    #tree_error_plot(as.data.frame(cost.tree$cptable))
     best.cp <- cost.tree$cptable[which.min(cost.tree$cptable[, 'xerror']), 'CP']
     # best tree
     cost.tree2 <- rpart(Total.year2~.,
@@ -966,9 +818,9 @@ expenditure_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', save
     cat('Tree MSE:', tree.mse, '\n')
     cat('Improvement in forest over tree:', (tree.mse-forest.mse)/tree.mse, '\n')
 }
-#expenditure_forest_analysis(mset, predictors, saveit=TRUE)
+expenditure_forest_analysis(mset, predictors)
 
-hospitalization_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', saveit=FALSE){
+hospitalization_forest_analysis <- function(dset, predictors, p=0.7){
     dset <- dset %>% select(all_of(predictors), Total.year1, Anyhosp2017)
     dset <- dset %>% mutate(Anyhosp2017=factor(Anyhosp2017))
     total.rows <- nrow(dset)
@@ -991,7 +843,7 @@ hospitalization_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', 
                        method='class',
                        control=rpart.control(cp=0.001))
     #printcp(hosp.tree)
-    #tree_error_plot(as.data.frame(hosp.tree$cptable), saveit=FALSE)
+    #tree_error_plot(as.data.frame(hosp.tree$cptable))
     best.cp <- hosp.tree$cptable[which.min(hosp.tree$cptable[, 'xerror']), 'CP']
     # best tree
     hosp.tree2 <- rpart(Anyhosp2017~.,
@@ -1004,5 +856,5 @@ hospitalization_forest_analysis <- function(dset, predictors, p=0.7, ext='pdf', 
     ttab <- ttab %>% filter(Anyhosp2017 != Tree)
     cat('Misclassification error for tree:', ttab %>% with(sum(Freq)), '\n')
 }
-#hospitalization_forest_analysis(mset, predictors, saveit=TRUE)
+hospitalization_forest_analysis(mset, predictors)
 

@@ -1,8 +1,7 @@
 ##################################################
-# Create figures and tables for Chapter 5
+# Chapter 5 examples
 ##################################################
 library(tidyverse)
-library(xtable)
 library(grid)
 library(scales)
 library(viridis)
@@ -11,16 +10,11 @@ library(MASS)
 library(pscl)
 library(tableone)
 
-if(Sys.getenv('RSTUDIO') == '1')
-  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-
-source('shared.R')
-
 ##################################################
 # Basic Health Plan data
 ##################################################
 grab_and_curate_bph <- function(filename){
-    dset <- read.dta(here('data', filename), convert.factors=FALSE)
+    dset <- read.dta(filename, convert.factors=FALSE)
     dset <- dset %>% filter(between(age, 18, Inf))
     dset <- dset %>% mutate(sex=factor(sex, levels=c(0, 1), labels=c('Women', 'Men')),
                             raceind=factor(raceind, levels=c(0, 1), labels=c('White', 'Other')),
@@ -30,15 +24,15 @@ grab_and_curate_bph <- function(filename){
                                                                'Clallam',
                                                                'Pierce',
                                                                'Spokane IPA')))
-    dset
+    return(dset)
 }
-#dset <- grab_and_curate_bph('bhpdata.dta')
+dset <- grab_and_curate_bph('basic_health_plan.dta')
 
 ##################################################
 # Prostate cancer mortality data
 ##################################################
 grab_and_curate_seer <- function(filename){
-    dset <- read.dta(here('data', filename), convert.factors=FALSE)
+    dset <- read.dta(filename, convert.factors=FALSE)
     dset <- dset %>% rename(Race='race',
                             Year='yeardeath',
                             Rate='deathrate',
@@ -47,9 +41,10 @@ grab_and_curate_seer <- function(filename){
     dset <- dset %>% mutate(Race=factor(Race,
                                         levels=c('white', 'black'),
                                         labels=c('White', 'Black')))
-    dset %>% dplyr::select(Race, Year, Deaths, Population, Rate)
+    dset <- dset %>% dplyr::select(Race, Year, Deaths, Population, Rate)
+    return(dset)
 }
-#sset <- grab_and_curate_seer('mortality-2v12.dta')
+sset <- grab_and_curate_seer('seer_prostate_cancer_mortality.dta')
 
 ##################################################
 # Visualize Poisson and negative binomial distributions
@@ -62,13 +57,13 @@ process_params <- function(iarg){
                      'mu'='mu',
                      'size'='alpha',
                      'lambda'='mu')
-    paste(paste(params, unlist(iarg), sep='=='), collapse='*\',\'~~')
+    return(paste(paste(params, unlist(iarg), sep='=='), collapse='*\',\'~~'))
 }
 
 scale_linear <- function(aarg, aargs){
     amin <- min(aargs)
     amax <- max(aargs)
-    (aarg-amin)/(amax-amin)
+    return((aarg-amin)/(amax-amin))
 }
 
 poisson_negative_binomial_plot <- function(dset=tibble(x=seq(0, 20)),
@@ -77,10 +72,8 @@ poisson_negative_binomial_plot <- function(dset=tibble(x=seq(0, 20)),
                                            darg=list(list(lambda=1),
                                                      list(lambda=5),
                                                      list(lambda=9)),
-                                           aargs=exp(seq(0, 3, by=0.5)),
-                                           ext='pdf',
-                                           saveit=FALSE){
-    gg_theme(legend.position=c(0.8, 0.8))
+                                           aargs=exp(seq(0, 3, by=0.5))){
+    theme_update(legend.position=c(0.8, 0.8))
     gg <- ggplot(dset, aes(x=x))
     for(index in 1:length(darg)){
         iarg <- darg[[index]]
@@ -127,25 +120,14 @@ poisson_negative_binomial_plot <- function(dset=tibble(x=seq(0, 20)),
                                   labels=parse_format())
     gg <- gg+labs(x='\nx', y='f(x)\n')
     print(gg)
-    if(saveit){
-        if(is.null(dfun2))
-            filename <- '05-poisson'
-        else
-            filename <- '05-poisson_negative_binomial'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#poisson_negative_binomial_plot(dfun2=NULL, saveit=FALSE)
-#poisson_negative_binomial_plot(dfun2=dnbinom, saveit=FALSE)
+poisson_negative_binomial_plot(dfun2=NULL)
+poisson_negative_binomial_plot(dfun2=dnbinom)
 
 ##################################################
 # Descriptive tables
 ##################################################
-bhp_table <- function(dset, saveit=FALSE){
+bhp_table <- function(dset){
     dset <- dset %>% mutate(provider=factor(provider, levels=c('Spokane HMO',
                                                                'Spokane IPA',
                                                                'Pierce',
@@ -184,23 +166,9 @@ bhp_table <- function(dset, saveit=FALSE){
                                                '\\quad',
                                                Characteristic,
                                                fixed=TRUE))
-    if(saveit){
-        filename <- '05-bhp_table.tex'
-        Caption <- 'Descriptive statistics of the Basic Health Plan data for persons age 18 years or older by health care provider.'
-        print(xtable(tset,
-                     digits=0,
-                     align='llcccc',
-                     label='tab:bhp_table',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.text.function=identity,
-              include.rownames=FALSE,
-              hline.after=0)
-    }
+    return(tset)
 }
-#bhp_table(dset, saveit=TRUE)
+bhp_table(dset)
 
 seer_table_helper <- function(dset, race, ivars=c('Year', 'Race')){
     dset <- dset %>% filter(Race == race)
@@ -208,40 +176,27 @@ seer_table_helper <- function(dset, race, ivars=c('Year', 'Race')){
                             Population=label_comma(accuracy=1)(Population))
     mvars <- setdiff(names(dset), ivars)
     names(dset)[match(mvars, names(dset))] <- paste0(mvars, ' (', unique(dset$Race), ')')
-    dset %>% dplyr::select(-Race)
+    dset <- dset %>% dplyr::select(-Race)
+    return(dset)
 }
 
-seer_table <- function(dset, saveit=FALSE){
+seer_table <- function(dset){
     dset <- dset %>% mutate(Race=substr(Race, 0, 1))
     wset <- dset %>% seer_table_helper('W')
     bset <- dset %>% seer_table_helper('B')
     xset <- full_join(wset, bset, by='Year')
-    if(saveit){
-        filename <- '05-seer_table.tex'
-        Caption <- 'Prostate cancer death rates for white (W) and black (B) men, 1990--2012.'
-        print(xtable(xset,
-                     digits=c(0, 0, 0, 0, 1, 0, 0, 1),
-                     align='lccccccc',
-                     label='tab:seer_table',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              include.rownames=FALSE,
-              hline.after=0)
-    }
+    return(xset)
 }
-#seer_table(sset, saveit=TRUE)
+seer_table(sset)
 
 ##################################################
 # Visualize outpatient visits
 ##################################################
-bhp_plot <- function(dset, ext='pdf', saveit=FALSE){
+bhp_plot <- function(dset){
     fset <- dset %>% dplyr::select(outvis, provider)
     fset <- fset %>% group_by(provider)
     fset <- fset %>% summarize(Mean=mean(outvis),
                                SD=sd(outvis))
-    gg_theme()
     gg <- ggplot(fset, aes(x=Mean, y=SD))
     gg <- gg+geom_point(aes(colour=provider), size=4)
     gg <- gg+geom_text(aes(colour=provider, label=provider),
@@ -257,27 +212,18 @@ bhp_plot <- function(dset, ext='pdf', saveit=FALSE){
                                 expand=c(0, 0))
     gg <- gg+scale_colour_viridis(discrete=TRUE, begin=0.6, end=0.1)
     print(gg)
-    if(saveit){
-        filename <- '05-bhp_mean_vs_sd'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#bhp_plot(dset, saveit=TRUE)
+bhp_plot(dset)
 
 ##################################################
 # Compare histogram of outpatient visits to Poisson
 # distribution with the same mean
 ##################################################
-bhp_histogram <- function(dset, ext='pdf', saveit=FALSE){
+bhp_histogram <- function(dset){
     bpoints <- c(seq(-0.5, 40.5), 500)
     hdat <- hist(dset[['outvis']], breaks=bpoints, plot=FALSE)
     hset <- with(hdat, data.frame(mids, density))
     hset <- hset %>% mutate(poisson=dpois(mids, lambda=mean(dset$outvis)))
-    gg_theme()
     gg <- ggplot(hset)
     gg <- gg+geom_bar(aes(x=mids, y=density), stat='identity')
     gg <- gg+geom_path(aes(x=mids, y=poisson),
@@ -294,16 +240,8 @@ bhp_histogram <- function(dset, ext='pdf', saveit=FALSE){
                                 breaks=seq(0, 0.25, by=0.05),
                                 expand=c(0, 0))
     print(gg)
-    if(saveit){
-        filename <- '05-bhp_histogram'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#bhp_histogram(dset, saveit=TRUE)
+bhp_histogram(dset)
 
 ##################################################
 # Fit Poisson and negative binomial models
@@ -320,10 +258,11 @@ format_model_helper <- function(cset, dset){
                                                ', ',
                                                sprintf('%4.2f', exp(Estimate+1.96*`Std. Error`)),
                                                ')'),
-                               'P-value'=sub('(.*)', '$\\1 $', format_pvalue(`Pr(>|z|)`)))
+                               'P-value'=sub('(.*)', '$\\1 $', `Pr(>|z|)`))
     cset <- cset %>% filter(grepl('^provider', Predictor))
     cset <- cset %>% mutate(Predictor=sub('^provider = ', '', Predictor))
     cset <- cset %>% rename(Provider='Predictor')
+    return(cset)
 }
 
 format_model <- function(fit, dset){
@@ -350,14 +289,13 @@ format_model <- function(fit, dset){
                                                                'Pierce',
                                                                'Clallam')))
     cset <- cset %>% arrange(Provider)
-    cset
+    return(cset)
 }
 
 bhp_model_table <- function(dset,
                             distribution='Poisson',
                             ext='pdf',
-                            exposure=FALSE,
-                            saveit=FALSE){
+                            exposure=FALSE){
     response <- 'outvis'
     predictor <- c('raceind', 'sex', 'age', 'provider', 'nchroniccat')
     if(exposure & !grepl('zero', distribution)){
@@ -384,33 +322,6 @@ bhp_model_table <- function(dset,
                         dist='negbin',
                         data=dset)
     fset <- format_model(fit, dset)
-    if(saveit){
-        fprefix <- '05-'
-        lprefix <- 'tab:'
-        esuffix <- ifelse(exposure, '_with_exposure', '_no_exposure')
-        dsuffix <- gsub(' ', '_', tolower(distribution))
-        filename <- paste0(fprefix, dsuffix, esuffix, '.tex')
-        Align <- ifelse(grepl('zero', distribution), 'lccccc', 'lccccc')
-        Label <- paste0(lprefix, dsuffix, esuffix)
-        Caption <- paste('Fitted',
-                         distribution,
-                         'regression of outpatient visits in the Basic Health Plan',
-                         ifelse(exposure, 'including the exposure variable', ''),
-                         'adjusted for age, sex, race and number of chronic conditions.',
-                         'Estimated risks are relative to Spokane HMO.')
-        print(xtable(fset,
-                     digits=0,
-                     align=Align,
-                     label=Label,
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.colnames.function=sanitize,
-              sanitize.text.function=identity,
-              include.rownames=FALSE,
-              hline.after=0)
-    }
     if(exposure & distribution == 'Poisson'){
         mset <- mset %>% drop_na()
         mset <- mset %>% mutate(predicted=predict(fit, type='response'),
@@ -418,7 +329,6 @@ bhp_model_table <- function(dset,
         mset <- mset %>% group_by(group)
         sset <- mset %>% summarize(mean=mean(predicted),
                                    variance=var(outvis))
-        gg_theme()
         gg <- ggplot(sset)
         gg <- gg+geom_point(aes(x=mean, y=variance),
                             colour='purple',
@@ -440,47 +350,18 @@ bhp_model_table <- function(dset,
                                     breaks=seq(0, 100, by=20),
                                     expand=c(0, 0))
         print(gg)
-        if(saveit){
-            filename <- '05-bhp_mean_vs_variance'
-            filename <- paste(filename, ext, sep='.')
-            ggsave(plot=gg,
-                   file=here('figures', filename),
-                   height=5,
-                   width=10)
-        }
     }
     tibble(Model=distribution,
            Exposure=ifelse(exposure, 'Yes', 'No'),
            AIC=AIC(fit),
            BIC=BIC(fit))
 }
-#pne <- bhp_model_table(dset, distribution='Poisson', exposure=FALSE, saveit=TRUE)
-#pwe <- bhp_model_table(dset, distribution='Poisson', exposure=TRUE, saveit=TRUE)
-#nbwe <- bhp_model_table(dset, distribution='negative binomial', exposure=TRUE, saveit=TRUE)
-#zpwe <- bhp_model_table(dset, distribution='zero-inflated Poisson', exposure=TRUE, saveit=TRUE)
-#znbwe <- bhp_model_table(dset, distribution='zero-inflated negative binomial', exposure=TRUE, saveit=TRUE)
-#abset <- bind_rows(pne, pwe, nbwe, zpwe, znbwe)
-
-##################################################
-# Summarize AIC and BIC
-##################################################
-aic_bic_table <- function(dset){
-    dset <- dset %>% mutate(Model=sub('^n', 'N', Model),
-                            Model=sub('^z', 'Z', Model))
-    filename <- '05-aic_bic.tex'
-    Caption <- 'AIC and BIC for standard and zero-inflated Poisson and negative binomial models fit to outpatient visits in the Basic Health Plan.'
-    print(xtable(dset,
-                 digits=0,
-                 align='llccc',
-                 label='tab:aic_bic',
-                 caption=Caption),
-          file=here('tables', filename),
-          table.placement='!ht',
-          caption.placement='bottom',
-          include.rownames=FALSE,
-          hline.after=0)
-}
-#aic_bic_table(abset)
+pne <- bhp_model_table(dset, distribution='Poisson', exposure=FALSE)
+pwe <- bhp_model_table(dset, distribution='Poisson', exposure=TRUE)
+nbwe <- bhp_model_table(dset, distribution='negative binomial', exposure=TRUE)
+zpwe <- bhp_model_table(dset, distribution='zero-inflated Poisson', exposure=TRUE)
+znbwe <- bhp_model_table(dset, distribution='zero-inflated negative binomial', exposure=TRUE)
+abset <- bind_rows(pne, pwe, nbwe, zpwe, znbwe)
 
 ##################################################
 # Prostate cancer mortality
@@ -511,52 +392,38 @@ seer_model_helper <- function(dset, exposure=FALSE, interact=FALSE, fitonly=FALS
                                                ', ',
                                                sprintf('%4.2f', exp(Estimate+1.96*`Std. Error`)),
                                                ')'),
-                               'P-value'=sub('(.*)', '$\\1 $', format_pvalue(`Pr(>|z|)`)))
+                               'P-value'=sub('(.*)', '$\\1 $', `Pr(>|z|)`))
     cset <- cset %>% filter(Predictor != 'Intercept')
-    data.frame(Model=case_when(!exposure ~ 1,
-                               exposure & !interact ~ 2,
-                               exposure & interact ~ 3),
-               Exposure=ifelse(exposure, 'Yes', 'No'),
-               Interaction=ifelse(interact, 'Yes', 'No'),
-               cset,
-               stringsAsFactors=FALSE,
-               check.names=FALSE)
+    cset <- data.frame(Model=case_when(!exposure ~ 1,
+                                       exposure & !interact ~ 2,
+                                       exposure & interact ~ 3),
+                       Exposure=ifelse(exposure, 'Yes', 'No'),
+                       Interaction=ifelse(interact, 'Yes', 'No'),
+                       cset,
+                       stringsAsFactors=FALSE,
+                       check.names=FALSE)
+    return(cset)
 }
 
-seer_model_table <- function(dset, saveit=FALSE){
+seer_model_table <- function(dset){
     mset <- dset %>% mutate(Year=Year-min(Year))
     model1 <- seer_model_helper(mset, exposure=FALSE, interact=FALSE)
     model2 <- seer_model_helper(mset, exposure=TRUE, interact=FALSE)
     model3 <- seer_model_helper(mset, exposure=TRUE, interact=TRUE)
     models <- bind_rows(model1, model2, model3)
-    if(saveit){
-        filename <- '05-seer_poisson_models.tex'
-        Caption <- 'Three Poisson regression models fit to annual prostate cancer deaths.'
-        print(xtable(models,
-                     digits=0,
-                     align='lccclccc',
-                     label='tab:seer_poisson_models',
-                     caption=Caption),
-              file=here('tables', filename),
-              table.placement='!ht',
-              caption.placement='bottom',
-              sanitize.colnames.function=sanitize,
-              sanitize.text.function=identity,
-              include.rownames=FALSE,
-              hline.after=c(0, cumsum(c(nrow(model1), nrow(model2)))))
-    }
-    seer_model_helper(dset, exposure=TRUE, interact=TRUE, fitonly=TRUE)
+    print(models)
+    return(seer_model_helper(dset, exposure=TRUE, interact=TRUE, fitonly=TRUE))
 }
-#fit <- seer_model_table(sset, saveit=TRUE)
+fit <- seer_model_table(sset)
 
 ##################################################
 # Visualize observed and fitted prostate cancer mortality
 ##################################################
-seer_plot <- function(dset, fit, ext='pdf', saveit=FALSE){
+seer_plot <- function(dset, fit){
     dset <- dset %>% mutate(Race=relevel(Race, ref='Black'),
                             Observed=1e5*Deaths/Population,
                             Fitted=1e5*fitted(fit)/Population)
-    gg_theme()
+    theme_update(legend.position='none')
     gg <- ggplot(dset)
     gg <- gg+geom_point(aes(x=Year, y=Observed, colour=Race),
                         size=2)
@@ -573,14 +440,6 @@ seer_plot <- function(dset, fit, ext='pdf', saveit=FALSE){
                                 expand=c(0, 0))
     gg <- gg+scale_colour_manual(name='', values=c(White=muted('#56B4E9'), Black=muted('seagreen')))
     print(gg)
-    if(saveit){
-        filename <- '05-seer_poisson_with_exposure_with_interaction'
-        filename <- paste(filename, ext, sep='.')
-        ggsave(plot=gg,
-               file=here('figures', filename),
-               height=5,
-               width=10)
-    }
 }
-#seer_plot(sset, fit, saveit=TRUE)
+seer_plot(sset, fit)
 
