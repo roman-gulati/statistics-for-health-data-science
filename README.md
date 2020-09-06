@@ -20,6 +20,6 @@ This page provides R code for downloading data from two national health surveys 
 
 ### Datasets used in Chapter 5:
 
-  - [Outpatient visits in the Basic Health Plan of Washington State](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/data/basic_health_plan.dta)
-  - [Prostate cancer mortality from the Surveillance, Epidemiology, and End Results program](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/data/seer_prostate_cancer_mortality.dta)
+  - [Outpatient visits in the Basic Health Plan of Washington State](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/data/basic_health_plan.dta)
+  - [Prostate cancer mortality from the Surveillance, Epidemiology, and End Results program](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/data/seer_prostate_cancer_mortality.dta)
 
