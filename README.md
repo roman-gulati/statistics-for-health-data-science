@@ -2,21 +2,21 @@ This page provides R code for downloading data from two national health surveys 
 
 ### R code for downloading data from national health surveys:
 
- - [Medical Expenditure Panel Survey (MEPS)](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/grab_meps.R)
- - [National Health and Nutrition Examination Survey (NHANES)](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/grab_nhanes.R)
+ - [Medical Expenditure Panel Survey (MEPS)](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/grab_meps.R)
+ - [National Health and Nutrition Examination Survey (NHANES)](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/grab_nhanes.R)
   
 ### R code for example analyses:
 
-  - [Chapter 1: Statistics and health data](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter1.R)
-  - [Chapter 2: Key statistical concepts](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter2.R)
-  - [Chapter 3: Regression analysis](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter3.R)
-  - [Chapter 4: Binary and categorical outcomes](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter4.R)
-  - [Chapter 5: Count outcomes](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter5.R)
-  - [Chapter 6: Health care costs](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter6.R)
-  - [Chapter 7: Bootstrap methods](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter7.R)
-  - [Chapter 8: Causal inference](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter8.R)
-  - [Chapter 9: Survey data analysis](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter9.R)
-  - [Chapter 10: Prediction](https://github.com/roman-gulati/statistics-for-health-data-science/blob/master/src/chapter10.R)
+  - [Chapter 1: Statistics and health data](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter1.R)
+  - [Chapter 2: Key statistical concepts](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter2.R)
+  - [Chapter 3: Regression analysis](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter3.R)
+  - [Chapter 4: Binary and categorical outcomes](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter4.R)
+  - [Chapter 5: Count outcomes](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter5.R)
+  - [Chapter 6: Health care costs](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter6.R)
+  - [Chapter 7: Bootstrap methods](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter7.R)
+  - [Chapter 8: Causal inference](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter8.R)
+  - [Chapter 9: Survey data analysis](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter9.R)
+  - [Chapter 10: Prediction](https://raw.githubusercontent.com/roman-gulati/statistics-for-health-data-science/master/src/chapter10.R)
 
 ### Datasets used in Chapter 5:
 
