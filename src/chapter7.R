@@ -113,10 +113,12 @@ two_panel_plot(pset,
 ##################################################
 median_cost_histogram <- function(dset, panel_title, B=5000, sample_size=2000, nbreaks=30){
     original_size <- nrow(dset)
-    if(tolower(panel_title) == 'population')
-        dset <- dset %>% sample_n(size=sample_size, replace=TRUE)
     rset <- bootstraps(dset, times=B)
-    ests <- map_dbl(rset$splits, function(x) median(as.data.frame(x)$Cost))
+    if(tolower(panel_title) == 'population'){
+        ests <- map_dbl(rset$splits, function(x) median(sample(as.data.frame(x)$Cost, size=sample_size, replace=TRUE)))
+    } else {
+        ests <- map_dbl(rset$splits, function(x) median(as.data.frame(x)$Cost))
+    }
     hdat <- hist(ests, breaks=nbreaks, plot=FALSE)
     hset <- with(hdat, data.frame(mids, density))
     cat('Range of median costs in', tolower(panel_title), ':', min(ests), max(ests), '\n')
