@@ -6,19 +6,37 @@ grab_meps <- function(year, inscope_only=TRUE){
     names(code) <- seq(1996, 2017)
     stopifnot(year %in% names(code))
     year_code <- code[[as.character(year)]]
-    archive_filename <- paste0(year_code, 'ssp.zip')
-    remote_sas_archive <- paste0('https://meps.ahrq.gov/mepsweb/data_files/pufs/',
-                                 archive_filename)
-    local_sas_archive <- paste0(year_code, 'ssp.zip')
     local_rdata <- paste(year_code, 'Rdata', sep='.')
     if(file.exists(local_rdata)){
         load(file=local_rdata)
     } else {
-        download.file(remote_sas_archive, local_sas_archive, mode='wb')
-        dset <- foreign::read.xport(unzip(local_sas_archive))
-        local_sas_file <- sub('ssp.zip$', '.ssp', local_sas_archive)
-        file.copy(local_sas_file, local_rdata, overwrite=TRUE)
-        unlink(local_sas_file)
+        if(year < 2017){
+            archive_filename <- paste0(year_code, 'ssp.zip')
+            remote_archive <- paste0('https://meps.ahrq.gov/mepsweb/data_files/pufs/',
+                                     archive_filename)
+            local_archive <- paste0(year_code, 'ssp.zip')
+            old_timeout <- getOption('timeout')
+            options(timeout=max(300, old_timeout))
+            download.file(remote_archive, local_archive, mode='wb')
+            options(timeout=old_timeout)
+            dset <- foreign::read.xport(unzip(local_archive))
+            local_file <- sub('ssp.zip$', '.ssp', local_archive)
+        } else {
+            archive_filename <- paste0(year_code, 'dta.zip')
+            remote_archive <- paste0('https://meps.ahrq.gov/data_files/pufs/',
+                                     year_code,
+                                     '/',
+                                     archive_filename)
+            local_archive <- paste0(year_code, 'dta.zip')
+            old_timeout <- getOption('timeout')
+            options(timeout=max(300, old_timeout))
+            download.file(remote_archive, local_archive, mode='wb')
+            options(timeout=old_timeout)
+            dset <- haven::read_dta(unzip(local_archive))
+            local_file <- sub('dta.zip$', '.dta', local_archive)
+        }
+        file.copy(local_file, local_rdata, overwrite=TRUE)
+        unlink(local_file)
         save(dset, file=local_rdata)
     }
     if(inscope_only){
