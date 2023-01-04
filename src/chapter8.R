@@ -92,7 +92,7 @@ matched_kidney_analysis <- function(dset, nreps=100){
     for(index in 1:nreps){
         # sample target size of individual records
         rset <- mset %>% group_by(Treatment, Size)
-        rset <- rset %>% sample_n(size=Target)
+        rset <- rset %>% sample_n(size=unique(Target))
         # calculate success rates for each treatment
         rset <- rset %>% group_by(Treatment)
         rset <- rset %>% summarize(Rate=sum(Successes)/n())
